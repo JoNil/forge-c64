@@ -1,0 +1,3 @@
+[submodule "llvm-mos"]
+	path = llvm-mos
+	url = git@github.com:llvm-mos/llvm-mos.git

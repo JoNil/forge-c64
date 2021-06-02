@@ -1,5 +1,7 @@
 #![no_std]
 
+use core::ptr::{read_volatile, write_volatile};
+
 extern "C" {
     fn __chrout(c: u8);
 }
@@ -33,12 +35,12 @@ fn clear_screen() {
 pub unsafe extern "C" fn main() {
     clear_screen();
 
-    *VIC_BGCOLOR = 0;
-    *VIC_BORDER_COLOR = 0;
-    *VIC_MULTI_COLOR_1 = 11;
-    *VIC_MULTI_COLOR_2 = 7;
-    *VIC_CR2 |= 0x10;
-    *VIC_CHAR_PTR |= 0x0e;
+    write_volatile(VIC_BGCOLOR, 0);
+    write_volatile(VIC_BORDER_COLOR, 0);
+    write_volatile(VIC_MULTI_COLOR_1, 11);
+    write_volatile(VIC_MULTI_COLOR_2, 7);
+    write_volatile(VIC_CR2, *VIC_CR2 | 0x10);
+    write_volatile(VIC_CHAR_PTR, *VIC_CHAR_PTR | 0x0e);
 
     {
         let charset = &mut *CHARSET;
@@ -48,29 +50,25 @@ pub unsafe extern "C" fn main() {
         }
     }
 
-    {
-        let screen = &mut *SCREEN;
+    let mut animation_counter: u8 = 0b1000000;
 
-        for (screen, map) in screen.iter_mut().zip(MAP.iter()) {
-            *screen = *map;
+    loop {
+        while read_volatile(VIC_RASTER_LINE) != 251 {}
+
+        write_volatile(VIC_BORDER_COLOR, 5);
+
+        {
+            let screen = &mut *SCREEN;
+
+            for (screen, map) in screen.iter_mut().zip(MAP.iter()) {
+                *screen = *map | animation_counter;
+            }
         }
-    }
 
-    /*__chrout(b'H');
-    __chrout(b'E');
-    __chrout(b'L');
-    __chrout(b'L');
-    __chrout(b'O');
-    __chrout(b' ');
-    __chrout(b'F');
-    __chrout(b'R');
-    __chrout(b'O');
-    __chrout(b'M');
-    __chrout(b' ');
-    __chrout(b'R');
-    __chrout(b'U');
-    __chrout(b'S');
-    __chrout(b'T');*/
+        animation_counter = animation_counter.wrapping_add(0b1000000);
+
+        write_volatile(VIC_BORDER_COLOR, 0);
+    }
 }
 
 static TILESET: [u8; 2048] = [

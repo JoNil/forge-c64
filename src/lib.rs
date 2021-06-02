@@ -13,7 +13,7 @@ fn factorial(n: u16) -> u16 {
 
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
-pub unsafe extern "C" fn start() {
+pub unsafe extern "C" fn main() {
     __chrout(b'H');
     __chrout(b'E');
     __chrout(b'L');

@@ -33,6 +33,13 @@ fn clear_screen() {
 pub unsafe extern "C" fn main() {
     clear_screen();
 
+    *VIC_BGCOLOR = 0;
+    *VIC_BORDER_COLOR = 0;
+    *VIC_MULTI_COLOR_1 = 11;
+    *VIC_MULTI_COLOR_2 = 7;
+    *VIC_CR2 |= 0x10;
+    *VIC_CHAR_PTR |= 0x0e;
+
     {
         let charset = &mut *CHARSET;
 
@@ -48,13 +55,6 @@ pub unsafe extern "C" fn main() {
             *screen = *map;
         }
     }
-
-    *VIC_BGCOLOR = 0;
-    *VIC_BORDER_COLOR = 0;
-    *VIC_MULTI_COLOR_1 = 11;
-    *VIC_MULTI_COLOR_2 = 7;
-    *VIC_CR2 |= 0x10;
-    *VIC_CHAR_PTR |= 0x0e;
 
     /*__chrout(b'H');
     __chrout(b'E');

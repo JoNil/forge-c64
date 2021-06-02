@@ -4,13 +4,6 @@ extern "C" {
     fn __chrout(c: u8);
 }
 
-fn factorial(n: u16) -> u16 {
-    match n {
-        0 => 1,
-        _ => n * factorial(n - 1),
-    }
-}
-
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn main() {

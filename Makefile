@@ -9,7 +9,7 @@ src/forge.s: src/lib.ll Makefile
 	${CLANG} src/lib.ll -o src/forge.s -Wl,--lto-emit-asm
 
 src/lib.ll: src/lib.rs Makefile
-	rustc +nightly src/lib.rs --emit=llvm-ir --crate-type=rlib -C debuginfo=0 -C opt-level=s -o src/lib.ll
+	rustc src/lib.rs --emit=llvm-ir --crate-type=rlib -C debuginfo=0 -C opt-level=s -o src/lib.ll
 
 clean:
 	rm -f src/*.ll

@@ -6,26 +6,43 @@ extern "C" {
     fn __chrout(c: u8);
 }
 
-const SCREEN: *mut [u8; 1000] = 0x0400 as *mut [u8; 1000];
+const SCREEN_1: *mut [u8; 1000] = 0x0400 as *mut [u8; 1000];
+const SCREEN_2: *mut [u8; 1000] = 0x3400 as *mut [u8; 1000];
 const CHARSET: *mut [u8; 2048] = 0x3800 as *mut [u8; 2048];
 
 const VIC_Y_SCROLL: *mut u8 = 0xd011 as *mut u8;
 const VIC_RASTER_LINE_HIGH_BIT: *mut u8 = 0xd011 as *mut u8;
 const VIC_RASTER_LINE: *mut u8 = 0xd012 as *mut u8;
 const VIC_X_SCROLL: *mut u8 = 0xd016 as *mut u8;
-const VIC_CHAR_PTR: *mut u8 = 0xd018 as *mut u8;
+const VIC_MEMORY_PTRS: *mut u8 = 0xd018 as *mut u8;
 const VIC_BORDER_COLOR: *mut u8 = 0xd020 as *mut u8;
 const VIC_BGCOLOR: *mut u8 = 0xd021 as *mut u8;
 const VIC_MULTI_COLOR_1: *mut u8 = 0xd022 as *mut u8;
 const VIC_MULTI_COLOR_2: *mut u8 = 0xd023 as *mut u8;
 const VIC_CR2: *mut u8 = 0xd016 as *mut u8;
 
-fn clear_screen() {
-    unsafe {
-        let screen = &mut *SCREEN;
+fn clear_screen(screen: &mut [u8; 1000]) {
+    for c in screen {
+        *c = 0x20;
+    }
+}
 
-        for c in screen {
-            *c = 0x20;
+static mut DRAW_TO_SCREEN_2: u8 = 0;
+
+fn swap_screen_buffer() {
+    unsafe {
+        if DRAW_TO_SCREEN_2 == 1 {
+            write_volatile(
+                VIC_MEMORY_PTRS,
+                (read_volatile(VIC_MEMORY_PTRS) & 0x0f) | 0xD0,
+            );
+            DRAW_TO_SCREEN_2 = 0;
+        } else {
+            write_volatile(
+                VIC_MEMORY_PTRS,
+                (read_volatile(VIC_MEMORY_PTRS) & 0x0f) | 0x10,
+            );
+            DRAW_TO_SCREEN_2 = 1;
         }
     }
 }
@@ -33,41 +50,42 @@ fn clear_screen() {
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn main() {
-    clear_screen();
+    clear_screen(&mut *SCREEN_1);
+    clear_screen(&mut *SCREEN_2);
 
     write_volatile(VIC_BGCOLOR, 0);
     write_volatile(VIC_BORDER_COLOR, 0);
     write_volatile(VIC_MULTI_COLOR_1, 11);
     write_volatile(VIC_MULTI_COLOR_2, 7);
     write_volatile(VIC_CR2, *VIC_CR2 | 0x10);
-    write_volatile(VIC_CHAR_PTR, *VIC_CHAR_PTR | 0x0e);
+    write_volatile(VIC_MEMORY_PTRS, read_volatile(VIC_MEMORY_PTRS) | 0x0e);
 
-    {
-        let charset = &mut *CHARSET;
-
-        for (ch, tile) in charset.iter_mut().zip(TILESET.iter()) {
-            *ch = *tile;
-        }
-    }
+    (&mut *CHARSET).copy_from_slice(&TILESET);
 
     let mut animation_counter: u8 = 0b1000000;
 
     loop {
         while read_volatile(VIC_RASTER_LINE) != 251 {}
 
-        write_volatile(VIC_BORDER_COLOR, 5);
+        swap_screen_buffer();
+
+        //write_volatile(VIC_BORDER_COLOR, 5);
 
         {
-            let screen = &mut *SCREEN;
+            let screen = if DRAW_TO_SCREEN_2 == 1 {
+                &mut *SCREEN_2
+            } else {
+                &mut *SCREEN_1
+            };
 
-            for (screen, map) in screen.iter_mut().zip(MAP.iter()) {
-                *screen = *map | animation_counter;
+            for i in 0..screen.len() {
+                screen[i] = (MAP[i] & 0x3f) | animation_counter;
             }
         }
 
         animation_counter = animation_counter.wrapping_add(0b1000000);
 
-        write_volatile(VIC_BORDER_COLOR, 0);
+        //write_volatile(VIC_BORDER_COLOR, 0);
     }
 }
 

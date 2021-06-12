@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(clippy::needless_range_loop)]
+#![allow(clippy::manual_range_contains)]
 #![allow(dead_code)]
 
 use core::ptr::{read_volatile, write_volatile};
@@ -49,6 +50,51 @@ fn swap_screen_buffer() {
     }
 }
 
+const ANIMATION_COUNTER_MASK: u8 = 0x3f;
+const RESOURCE_BIT: u8 = 0x10;
+const MAP_WIDTH: u8 = 40;
+const MAP_HEIGHT: u8 = 25;
+
+fn has_resource(tile: u8) -> bool {
+    tile & RESOURCE_BIT > 0
+}
+
+fn set_resource(tile: u8) -> u8 {
+    tile | RESOURCE_BIT
+}
+
+fn clear_resource(tile: u8) -> u8 {
+    tile & (!RESOURCE_BIT)
+}
+
+fn read_map(x: u8, y: u8) -> u8 {
+    unsafe { *MAP.get_unchecked(((x as u16) + (y as u16) * (MAP_WIDTH as u16)) as usize) }
+}
+
+fn write_map(x: u8, y: u8, val: u8) {
+    unsafe { *MAP.get_unchecked_mut(((x as u16) + (y as u16) * (MAP_WIDTH as u16)) as usize) = val }
+}
+
+fn is_depositing_down(tile: u8) -> bool {
+    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    tile == 4 || tile == 8 || tile == 12
+}
+
+fn is_depositing_up(tile: u8) -> bool {
+    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    tile == 2 || tile == 6 || tile == 10
+}
+
+fn is_depositing_right(tile: u8) -> bool {
+    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    tile == 3 || tile == 7 || tile == 11
+}
+
+fn is_depositing_left(tile: u8) -> bool {
+    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    tile == 1 || tile == 5 || tile == 9
+}
+
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn main() {
@@ -59,14 +105,14 @@ pub unsafe extern "C" fn main() {
     write_volatile(VIC_BORDER_COLOR, 0);
     write_volatile(VIC_MULTI_COLOR_1, 11);
     write_volatile(VIC_MULTI_COLOR_2, 7);
-    write_volatile(VIC_CR2, *VIC_CR2 | 0x10);
+    write_volatile(VIC_CR2, read_volatile(VIC_CR2) | 0x10);
     write_volatile(VIC_MEMORY_PTRS, read_volatile(VIC_MEMORY_PTRS) | 0x0e);
 
     (&mut *CHARSET).copy_from_slice(&TILESET);
 
     // Clear animation counter
     for i in 0..MAP.len() {
-        MAP[i] &= 0x3f;
+        MAP[i] &= ANIMATION_COUNTER_MASK;
     }
 
     let mut animation_counter: u8 = 0b1000000;
@@ -79,6 +125,41 @@ pub unsafe extern "C" fn main() {
         //write_volatile(VIC_BORDER_COLOR, 5);
 
         {
+            // Update map
+
+            if animation_counter == 0b1100_0000 {
+                for x in 1u8..(MAP_WIDTH - 1) {
+                    for y in 1u8..(MAP_HEIGHT - 1) {
+                        let tile = read_map(x, y);
+
+                        if !has_resource(tile) {
+                            let down = read_map(x, y + 1);
+                            let up = read_map(x, y - 1);
+                            let left = read_map(x - 1, y);
+                            let right = read_map(x + 1, y);
+
+                            if has_resource(down) && is_depositing_up(down) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x, y + 1, clear_resource(down));
+                            } else if has_resource(up) && is_depositing_down(up) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x, y - 1, clear_resource(up));
+                            } else if has_resource(left) && is_depositing_right(left) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x - 1, y, clear_resource(left));
+                            } else if has_resource(right) && is_depositing_left(right) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x + 1, y, clear_resource(right));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        {
+            // Copy map to screen
+
             let screen = if DRAW_TO_SCREEN_2 == 1 {
                 &mut *SCREEN_2
             } else {

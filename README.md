@@ -1,6 +1,6 @@
 # C64 Experiments
 
-## Build
+## Build Compiler
 git clone https://github.com/JoNil/forge-c64
 
 cd forge-c64
@@ -26,17 +26,20 @@ cd ..
 
 cd rust-mos
 export RUST_TARGET_PATH=/usr/local/rust-mos-targets/
+sudo mkdir -p $RUST_TARGET_PATH
+sudo chown $USER:$USER $RUST_TARGET_PATH
+
 cp config.toml.example config.toml
 # in config.toml adjust path to llvm-config
 # if llvm-mos is installed to other than /usr/local prefix
 ./x.py build -i --stage 0 src/tools/cargo
-./x.py build -i && (
+./x.py build -i
 ln -s ../../stage0-tools-bin/cargo build/x86_64-unknown-linux-gnu/stage1/bin/cargo
-    rustup toolchain link mos build/x86_64-unknown-linux-gnu/stage1
-    rustup default mos
-    mkdir -p $RUST_TARGET_PATH
-    python3 create_mos_targets.py $RUST_TARGET_PATH
-)
+rustup toolchain link mos build/x86_64-unknown-linux-gnu/stage1
+rustup default mos
+
+## Build
+cargo build -Zbuild-std=core,alloc --target mos-c64-none.json
 
 ## Links
 - https://github.com/llvm-mos/llvm-mos

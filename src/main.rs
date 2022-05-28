@@ -94,83 +94,85 @@ fn is_depositing_left(tile: u8) -> bool {
 }
 
 #[start]
-pub unsafe fn main(_argc: isize, _argv: *const *const u8) -> isize {
-    clear_screen(&mut *SCREEN_1);
-    clear_screen(&mut *SCREEN_2);
+pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
+    unsafe {
+        clear_screen(&mut *SCREEN_1);
+        clear_screen(&mut *SCREEN_2);
 
-    write_volatile(VIC_BGCOLOR, 0);
-    write_volatile(VIC_BORDER_COLOR, 0);
-    write_volatile(VIC_MULTI_COLOR_1, 11);
-    write_volatile(VIC_MULTI_COLOR_2, 7);
-    write_volatile(VIC_CR2, read_volatile(VIC_CR2) | 0x10);
-    write_volatile(VIC_MEMORY_PTRS, read_volatile(VIC_MEMORY_PTRS) | 0x0e);
+        write_volatile(VIC_BGCOLOR, 0);
+        write_volatile(VIC_BORDER_COLOR, 0);
+        write_volatile(VIC_MULTI_COLOR_1, 11);
+        write_volatile(VIC_MULTI_COLOR_2, 7);
+        write_volatile(VIC_CR2, read_volatile(VIC_CR2) | 0x10);
+        write_volatile(VIC_MEMORY_PTRS, read_volatile(VIC_MEMORY_PTRS) | 0x0e);
 
-    (&mut *CHARSET).copy_from_slice(&TILESET);
+        (&mut *CHARSET).copy_from_slice(&TILESET);
 
-    // Clear animation counter
-    for i in 0..MAP.len() {
-        MAP[i] &= ANIMATION_COUNTER_MASK;
-    }
+        // Clear animation counter
+        for i in 0..MAP.len() {
+            MAP[i] &= ANIMATION_COUNTER_MASK;
+        }
 
-    let mut animation_counter: u8 = 0b1000000;
+        let mut animation_counter: u8 = 0b1000000;
 
-    loop {
-        while read_volatile(VIC_RASTER_LINE) != 251 {}
+        loop {
+            while read_volatile(VIC_RASTER_LINE) != 251 {}
 
-        swap_screen_buffer();
+            swap_screen_buffer();
 
-        //write_volatile(VIC_BORDER_COLOR, 5);
+            //write_volatile(VIC_BORDER_COLOR, 5);
 
-        {
-            // Update map
+            {
+                // Update map
 
-            if animation_counter == 0b1100_0000 {
-                for x in 1u8..(MAP_WIDTH - 1) {
-                    for y in 1u8..(MAP_HEIGHT - 1) {
-                        let tile = read_map(x, y);
+                if animation_counter == 0b1100_0000 {
+                    for x in 1u8..(MAP_WIDTH - 1) {
+                        for y in 1u8..(MAP_HEIGHT - 1) {
+                            let tile = read_map(x, y);
 
-                        if !has_resource(tile) {
-                            let down = read_map(x, y + 1);
-                            let up = read_map(x, y - 1);
-                            let left = read_map(x - 1, y);
-                            let right = read_map(x + 1, y);
+                            if !has_resource(tile) {
+                                let down = read_map(x, y + 1);
+                                let up = read_map(x, y - 1);
+                                let left = read_map(x - 1, y);
+                                let right = read_map(x + 1, y);
 
-                            if has_resource(down) && is_depositing_up(down) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x, y + 1, clear_resource(down));
-                            } else if has_resource(up) && is_depositing_down(up) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x, y - 1, clear_resource(up));
-                            } else if has_resource(left) && is_depositing_right(left) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x - 1, y, clear_resource(left));
-                            } else if has_resource(right) && is_depositing_left(right) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x + 1, y, clear_resource(right));
+                                if has_resource(down) && is_depositing_up(down) {
+                                    write_map(x, y, set_resource(tile));
+                                    write_map(x, y + 1, clear_resource(down));
+                                } else if has_resource(up) && is_depositing_down(up) {
+                                    write_map(x, y, set_resource(tile));
+                                    write_map(x, y - 1, clear_resource(up));
+                                } else if has_resource(left) && is_depositing_right(left) {
+                                    write_map(x, y, set_resource(tile));
+                                    write_map(x - 1, y, clear_resource(left));
+                                } else if has_resource(right) && is_depositing_left(right) {
+                                    write_map(x, y, set_resource(tile));
+                                    write_map(x + 1, y, clear_resource(right));
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        {
-            // Copy map to screen
+            {
+                // Copy map to screen
 
-            let screen = if DRAW_TO_SCREEN_2 == 1 {
-                &mut *SCREEN_2
-            } else {
-                &mut *SCREEN_1
-            };
+                let screen = if DRAW_TO_SCREEN_2 == 1 {
+                    &mut *SCREEN_2
+                } else {
+                    &mut *SCREEN_1
+                };
 
-            for i in 0..screen.len() {
-                screen[i] = MAP[i] | animation_counter;
+                for i in 0..screen.len() {
+                    screen[i] = MAP[i] | animation_counter;
+                }
             }
+
+            animation_counter = animation_counter.wrapping_add(0b1000000);
+
+            //write_volatile(VIC_BORDER_COLOR, 0);
         }
-
-        animation_counter = animation_counter.wrapping_add(0b1000000);
-
-        //write_volatile(VIC_BORDER_COLOR, 0);
     }
 }
 

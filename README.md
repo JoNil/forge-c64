@@ -6,6 +6,9 @@ Open in vs code with dev container
 ## Build
 ./build.sh
 
+## Run
+"C:/Program Files/VICE/bin/x64sc.exe" target/mos-c64-none/release/forge-c64
+
 ## Build Environment
 docker run -it mrkits/rust-mos
 

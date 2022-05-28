@@ -8,9 +8,14 @@
         "rust-analyzer.checkOnSave.allTargets": false,
         "rust-analyzer.checkOnSave.command": "check",
         "rust-analyzer.rustfmt.overrideCommand": [
-            "cargo",
-            "+stable",
-            "fmt"
+            "rustup",
+            "run",
+            "stable",
+            "--",
+            "rustfmt",
+            "--edition",
+            "2021",
+            "--"
         ]
     }
 }

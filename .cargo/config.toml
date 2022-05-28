@@ -1,0 +1,6 @@
+[build]
+target = "mos-c64-none"
+rustflags = "-C panic=abort"
+
+[unstable]
+build-std = ["core", "alloc"]

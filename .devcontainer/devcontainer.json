@@ -1,0 +1,10 @@
+{
+    "image": "mrkits/rust-mos",
+    "extensions": [
+        "matklad.rust-analyzer",
+        "serayuzgur.crates"
+    ],
+    "settings": {
+        "rust-analyzer.checkOnSave.allTargets": false
+    }
+}

@@ -120,9 +120,9 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
             swap_screen_buffer();
 
-            //write_volatile(VIC_BORDER_COLOR, 5);
+            write_volatile(VIC_BORDER_COLOR, 5);
 
-            {
+            /*{
                 // Update map
 
                 if animation_counter == 0b1100_0000 {
@@ -153,7 +153,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                         }
                     }
                 }
-            }
+            }*/
 
             {
                 // Copy map to screen
@@ -171,7 +171,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
             animation_counter = animation_counter.wrapping_add(0b1000000);
 
-            //write_volatile(VIC_BORDER_COLOR, 0);
+            write_volatile(VIC_BORDER_COLOR, 0);
         }
     }
 }

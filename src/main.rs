@@ -122,7 +122,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
             write_volatile(VIC_BORDER_COLOR, 5);
 
-            /*{
+            {
                 // Update map
 
                 if animation_counter == 0b1100_0000 {
@@ -153,7 +153,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                         }
                     }
                 }
-            }*/
+            }
 
             {
                 // Copy map to screen

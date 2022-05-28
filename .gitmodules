@@ -4,3 +4,6 @@
 [submodule "llvm-mos-sdk"]
 	path = llvm-mos-sdk
 	url = git@github.com:llvm-mos/llvm-mos-sdk.git
+[submodule "rust-mos"]
+	path = rust-mos
+	url = https://github.com/mrk-its/rust-mos.git

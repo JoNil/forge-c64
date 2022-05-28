@@ -1,5 +1,8 @@
 # C64 Experiments
 
+## Develop
+Open in vs code with dev container
+
 ## Build
 ./build.sh
 

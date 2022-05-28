@@ -1,7 +1,7 @@
 {
     "image": "mrkits/rust-mos",
     "extensions": [
-        "matklad.rust-analyzer",
+        "rust-lang.rust-analyzer",
         "serayuzgur.crates"
     ],
     "settings": {

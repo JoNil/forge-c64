@@ -39,7 +39,7 @@ rustup toolchain link mos build/x86_64-unknown-linux-gnu/stage1
 rustup default mos
 
 ## Build
-cargo build -Zbuild-std=core,alloc --target mos-c64-none.json
+cargo build -Zbuild-std=core --target mos-c64-none.json
 
 ## Links
 - https://github.com/llvm-mos/llvm-mos

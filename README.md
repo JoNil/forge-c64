@@ -17,7 +17,26 @@ cmake -C clang/cmake/caches/MOS.cmake -G "Ninja" -S llvm -B build \
    -DLLVM_TARGETS_TO_BUILD="MOS;X86" \
    -DLLVM_ENABLE_PROJECTS="clang;lld;lldb"
 cmake --build build -t install
+cd ..
 
+cd llvm-mos-sdk
+cmake -G "Ninja" -B build
+cmake --build build -t install
+cd ..
+
+cd rust-mos
+export RUST_TARGET_PATH=/usr/local/rust-mos-targets/
+cp config.toml.example config.toml
+# in config.toml adjust path to llvm-config
+# if llvm-mos is installed to other than /usr/local prefix
+./x.py build -i --stage 0 src/tools/cargo
+./x.py build -i && (
+ln -s ../../stage0-tools-bin/cargo build/x86_64-unknown-linux-gnu/stage1/bin/cargo
+    rustup toolchain link mos build/x86_64-unknown-linux-gnu/stage1
+    rustup default mos
+    mkdir -p $RUST_TARGET_PATH
+    python3 create_mos_targets.py $RUST_TARGET_PATH
+)
 
 ## Links
 - https://github.com/llvm-mos/llvm-mos

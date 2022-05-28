@@ -1,4 +1,1 @@
-/target
-*.ll
-*.prg
-*.s
+target

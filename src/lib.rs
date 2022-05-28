@@ -1,8 +1,5 @@
 #![no_std]
 #![feature(start)]
-#![allow(clippy::needless_range_loop)]
-#![allow(clippy::manual_range_contains)]
-#![allow(dead_code)]
 
 use core::ptr::{read_volatile, write_volatile};
 
@@ -96,9 +93,8 @@ fn is_depositing_left(tile: u8) -> bool {
     tile == 1 || tile == 5 || tile == 9
 }
 
-
 #[start]
-unsafe fn main(_argc: isize, _argv: *const *const u8) -> isize {
+pub unsafe fn main(_argc: isize, _argv: *const *const u8) -> isize {
     clear_screen(&mut *SCREEN_1);
     clear_screen(&mut *SCREEN_2);
 

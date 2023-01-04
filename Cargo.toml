@@ -4,11 +4,18 @@ version = "0.1.0"
 authors = ["Jonathan Nilsson <jonathan@voysys.se>"]
 edition = "2021"
 
-[dependencies]
-
 [profile.dev]
+debug = 2
+opt-level = "s"
 lto = true
-opt-level = 1
+codegen-units = 1
 
 [profile.release]
+opt-level = "s"
 lto = true
+codegen-units = 1
+
+[dependencies]
+mos-hardware = { git = "https://github.com/mlund/mos-hardware", branch = "main" }
+mos-alloc = "0.2"
+ufmt-stdio = "0"

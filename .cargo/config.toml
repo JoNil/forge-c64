@@ -2,5 +2,8 @@
 target = "mos-c64-none"
 rustflags = "-C panic=abort"
 
+[target.mos-c64-none]
+runner = ["x64sc", "+confirmonexit"]
+
 [unstable]
 build-std = ["core", "alloc"]

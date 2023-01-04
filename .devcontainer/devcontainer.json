@@ -1,21 +1,11 @@
 {
     "image": "mrkits/rust-mos",
+    "settings": {
+        "rust-analyzer.checkOnSave.allTargets": false
+    },
     "extensions": [
         "rust-lang.rust-analyzer",
-        "serayuzgur.crates"
-    ],
-    "settings": {
-        "rust-analyzer.checkOnSave.allTargets": false,
-        "rust-analyzer.checkOnSave.command": "check",
-        "rust-analyzer.rustfmt.overrideCommand": [
-            "rustup",
-            "run",
-            "stable",
-            "--",
-            "rustfmt",
-            "--edition",
-            "2021",
-            "--"
-        ]
-    }
+        "serayuzgur.crates",
+        "bungcip.better-toml"
+    ]
 }

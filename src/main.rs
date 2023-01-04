@@ -169,11 +169,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                     &mut *SCREEN_1
                 };
 
-                for i in 0..screen.len() {
-                    screen[i] = MAP[i];
-                }
-
-                //screen.copy_from_slice(&MAP);
+                screen.copy_from_slice(&MAP);
             }
 
             animation_counter += 1;

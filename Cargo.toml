@@ -18,4 +18,3 @@ codegen-units = 1
 [dependencies]
 mos-hardware = { git = "https://github.com/mlund/mos-hardware", branch = "main" }
 mos-alloc = "0.2"
-ufmt-stdio = "0"

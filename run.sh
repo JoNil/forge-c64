@@ -1,2 +1,3 @@
 #!/bin/bash
-"C:/Program Files/VICE/bin/x64sc.exe" target/mos-c64-none/release/forge-c64
+./build.sh
+./tools/ef3utils/ef3usb.exe com4 s target/mos-c64-none/release/forge-c64

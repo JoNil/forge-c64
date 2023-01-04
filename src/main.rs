@@ -34,22 +34,22 @@ fn write_map(x: u8, y: u8, val: u8) {
 }
 
 fn is_depositing_down(tile: u8) -> bool {
-    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    let tile = tile & !RESOURCE_BIT;
     tile == 4 || tile == 8 || tile == 12
 }
 
 fn is_depositing_up(tile: u8) -> bool {
-    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    let tile = tile & !RESOURCE_BIT;
     tile == 2 || tile == 6 || tile == 10
 }
 
 fn is_depositing_right(tile: u8) -> bool {
-    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    let tile = tile & !RESOURCE_BIT;
     tile == 3 || tile == 7 || tile == 11
 }
 
 fn is_depositing_left(tile: u8) -> bool {
-    let tile = tile & ANIMATION_COUNTER_MASK & !RESOURCE_BIT;
+    let tile = tile & !RESOURCE_BIT;
     tile == 1 || tile == 5 || tile == 9
 }
 
@@ -107,7 +107,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         loop {
             while NEW_FRAME.get() == 1 {}
 
-            /*{
+            {
                 // Update map
 
                 for x in 1u8..(MAP_WIDTH - 1) {
@@ -136,7 +136,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                         }
                     }
                 }
-            }*/
+            }
 
             {
                 // Copy map to screen
@@ -172,6 +172,8 @@ fn set_screen_buffer() {
     unsafe { vic2.screen_and_charset_bank.write(bank) };
 }
 
+static mut SKIP_FRAME: Cell<u8> = Cell::new(0);
+
 #[no_mangle]
 pub extern "C" fn called_every_frame() {
     let vic2 = c64::vic2();
@@ -179,24 +181,29 @@ pub extern "C" fn called_every_frame() {
     unsafe {
         vic2.border_color.write(LIGHT_GREEN);
 
-        let animation_counter = ANIMATION_COUNTER.get() + 1;
-        if animation_counter == 4 {
-            ANIMATION_COUNTER.set(0);
-        } else {
-            ANIMATION_COUNTER.set(animation_counter);
-        }
-
-        if NEW_FRAME.get() == 1 {
-            if DRAW_TO_SCREEN_2.get() == 1 {
-                DRAW_TO_SCREEN_2.set(0);
+        if SKIP_FRAME.get() == 0 {
+            SKIP_FRAME.set(1);
+            let animation_counter = ANIMATION_COUNTER.get() + 1;
+            if animation_counter == 4 {
+                ANIMATION_COUNTER.set(0);
             } else {
-                DRAW_TO_SCREEN_2.set(1);
+                ANIMATION_COUNTER.set(animation_counter);
             }
+
+            if NEW_FRAME.get() == 1 {
+                if DRAW_TO_SCREEN_2.get() == 1 {
+                    DRAW_TO_SCREEN_2.set(0);
+                } else {
+                    DRAW_TO_SCREEN_2.set(1);
+                }
+            }
+
+            set_screen_buffer();
+
+            NEW_FRAME.set(0);
+        } else {
+            SKIP_FRAME.set(0);
         }
-
-        set_screen_buffer();
-
-        NEW_FRAME.set(0);
 
         vic2.border_color.write(BLACK);
     }

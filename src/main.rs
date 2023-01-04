@@ -1,53 +1,12 @@
 #![no_std]
 #![feature(start)]
 
-use core::ptr::{read_volatile, write_volatile};
-
+use core::hint::unreachable_unchecked;
 use mos_hardware::{
     c64,
-    vic2::{BLACK, GRAY1, YELLOW},
+    cia::GameController,
+    vic2::{CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, GREEN, YELLOW},
 };
-
-const SCREEN_1: *mut [u8; 1000] = 0x0400 as *mut [u8; 1000];
-const SCREEN_2: *mut [u8; 1000] = 0x3400 as *mut [u8; 1000];
-const CHARSET: *mut [u8; 2048] = 0x3800 as *mut [u8; 2048];
-
-const VIC_Y_SCROLL: *mut u8 = 0xd011 as *mut u8;
-const VIC_RASTER_LINE_HIGH_BIT: *mut u8 = 0xd011 as *mut u8;
-const VIC_RASTER_LINE: *mut u8 = 0xd012 as *mut u8;
-const VIC_X_SCROLL: *mut u8 = 0xd016 as *mut u8;
-const VIC_MEMORY_PTRS: *mut u8 = 0xd018 as *mut u8;
-const VIC_BORDER_COLOR: *mut u8 = 0xd020 as *mut u8;
-const VIC_BGCOLOR: *mut u8 = 0xd021 as *mut u8;
-const VIC_MULTI_COLOR_1: *mut u8 = 0xd022 as *mut u8;
-const VIC_MULTI_COLOR_2: *mut u8 = 0xd023 as *mut u8;
-const VIC_CR2: *mut u8 = 0xd016 as *mut u8;
-
-fn clear_screen(screen: &mut [u8; 1000]) {
-    for c in screen {
-        *c = 0x20;
-    }
-}
-
-static mut DRAW_TO_SCREEN_2: u8 = 0;
-
-fn swap_screen_buffer() {
-    unsafe {
-        if DRAW_TO_SCREEN_2 == 1 {
-            write_volatile(
-                VIC_MEMORY_PTRS,
-                (read_volatile(VIC_MEMORY_PTRS) & 0x0f) | 0xD0,
-            );
-            DRAW_TO_SCREEN_2 = 0;
-        } else {
-            write_volatile(
-                VIC_MEMORY_PTRS,
-                (read_volatile(VIC_MEMORY_PTRS) & 0x0f) | 0x10,
-            );
-            DRAW_TO_SCREEN_2 = 1;
-        }
-    }
-}
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 const RESOURCE_BIT: u8 = 0x10;
@@ -94,40 +53,80 @@ fn is_depositing_left(tile: u8) -> bool {
     tile == 1 || tile == 5 || tile == 9
 }
 
+fn clear_screen(screen: &mut [u8; 1000]) {
+    for c in screen {
+        *c = 0x20;
+    }
+}
+
+const SCREEN_1: *mut [u8; 1000] = 0x8800 as *mut [u8; 1000];
+const SCREEN_2: *mut [u8; 1000] = 0x8C00 as *mut [u8; 1000];
+// 0x9000-0x9fff, Free for cpu, vic sees original chars
+const CHARSET_1: *mut [u8; 2048] = 0xa000 as *mut [u8; 2048];
+const CHARSET_2: *mut [u8; 2048] = 0xa800 as *mut [u8; 2048];
+const CHARSET_3: *mut [u8; 2048] = 0xb000 as *mut [u8; 2048];
+const CHARSET_4: *mut [u8; 2048] = 0xb800 as *mut [u8; 2048];
+
+fn set_screen_buffer(animation_counter: u8, draw_to_screen_2: bool) {
+    let vic2 = c64::vic2();
+
+    let bank = match (animation_counter, draw_to_screen_2) {
+        (0, false) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
+        (1, false) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
+        (2, false) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
+        (3, false) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
+        (0, true) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
+        (1, true) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
+        (2, true) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
+        (3, true) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
+        _ => unsafe { unreachable_unchecked() },
+    };
+
+    unsafe { vic2.screen_and_charset_bank.write(bank) };
+}
+
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let vic2 = c64::vic2();
+    let cia2 = c64::cia2();
+
+    let mut draw_to_screen_2 = false;
 
     unsafe {
         clear_screen(&mut *SCREEN_1);
         clear_screen(&mut *SCREEN_2);
 
         vic2.border_color.write(BLACK);
-        vic2.border_color.write(BLACK);
-
+        vic2.background_color0.write(BLACK);
         vic2.background_color1.write(GRAY1);
         vic2.background_color2.write(YELLOW);
 
-        write_volatile(VIC_CR2, read_volatile(VIC_CR2) | 0x10);
-        write_volatile(VIC_MEMORY_PTRS, read_volatile(VIC_MEMORY_PTRS) | 0x0e);
+        vic2.control_x.modify(|mut v| v | ControlXFlags::MULTICOLOR);
 
-        (&mut *CHARSET).copy_from_slice(&TILESET);
+        // Set VIC2 memory at 0x8000–0xBFFF
+        cia2.data_direction_port_a.write(0b11);
+        cia2.port_a.write(GameController::from_bits(0b01).unwrap());
+
+        (&mut *CHARSET_1)[0..32].copy_from_slice(&TILESET[(0 + 0 * 64)..(32 + 0 * 64)]);
+        (&mut *CHARSET_2)[0..32].copy_from_slice(&TILESET[(0 + 1 * 64)..(32 + 1 * 64)]);
+        (&mut *CHARSET_3)[0..32].copy_from_slice(&TILESET[(0 + 2 * 64)..(32 + 2 * 64)]);
+        (&mut *CHARSET_4)[0..32].copy_from_slice(&TILESET[(0 + 3 * 64)..(32 + 3 * 64)]);
 
         // Clear animation counter
         for i in 0..MAP.len() {
             MAP[i] &= ANIMATION_COUNTER_MASK;
         }
 
-        let mut animation_counter: u8 = 0b1000000;
+        let mut animation_counter: u8 = 0;
 
         loop {
-            while read_volatile(VIC_RASTER_LINE) != 251 {}
+            while vic2.raster_counter.read() != 251 {}
 
-            swap_screen_buffer();
+            set_screen_buffer(animation_counter, draw_to_screen_2);
 
-            write_volatile(VIC_BORDER_COLOR, 5);
+            vic2.border_color.write(GREEN);
 
-            {
+            /*{
                 // Update map
 
                 if animation_counter == 0b1100_0000 {
@@ -158,25 +157,28 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                         }
                     }
                 }
-            }
+            }*/
 
             {
                 // Copy map to screen
 
-                let screen = if DRAW_TO_SCREEN_2 == 1 {
+                let screen = if draw_to_screen_2 {
                     &mut *SCREEN_2
                 } else {
                     &mut *SCREEN_1
                 };
 
                 for i in 0..screen.len() {
-                    screen[i] = MAP[i] | animation_counter;
+                    screen[i] = MAP[i];
                 }
             }
 
-            animation_counter = animation_counter.wrapping_add(0b1000000);
+            animation_counter += 1;
+            if animation_counter == 4 {
+                animation_counter = 0;
+            }
 
-            write_volatile(VIC_BORDER_COLOR, 0);
+            vic2.border_color.write(BLACK);
         }
     }
 }

@@ -5,7 +5,7 @@ use core::hint::unreachable_unchecked;
 use mos_hardware::{
     c64,
     cia::GameController,
-    vic2::{CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, GREEN, YELLOW},
+    vic2::{CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, GREEN, RED, YELLOW},
 };
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
@@ -101,16 +101,16 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         vic2.background_color1.write(GRAY1);
         vic2.background_color2.write(YELLOW);
 
-        vic2.control_x.modify(|mut v| v | ControlXFlags::MULTICOLOR);
+        vic2.control_x.modify(|v| v | ControlXFlags::MULTICOLOR);
 
         // Set VIC2 memory at 0x8000–0xBFFF
         cia2.data_direction_port_a.write(0b11);
         cia2.port_a.write(GameController::from_bits(0b01).unwrap());
 
-        (&mut *CHARSET_1)[0..32].copy_from_slice(&TILESET[(0 + 0 * 64)..(32 + 0 * 64)]);
-        (&mut *CHARSET_2)[0..32].copy_from_slice(&TILESET[(0 + 1 * 64)..(32 + 1 * 64)]);
-        (&mut *CHARSET_3)[0..32].copy_from_slice(&TILESET[(0 + 2 * 64)..(32 + 2 * 64)]);
-        (&mut *CHARSET_4)[0..32].copy_from_slice(&TILESET[(0 + 3 * 64)..(32 + 3 * 64)]);
+        (&mut *CHARSET_1)[0..256].copy_from_slice(&TILESET[8 * (0 * 64)..8 * (32 + 0 * 64)]);
+        (&mut *CHARSET_2)[0..256].copy_from_slice(&TILESET[8 * (1 * 64)..8 * (32 + 1 * 64)]);
+        (&mut *CHARSET_3)[0..256].copy_from_slice(&TILESET[8 * (2 * 64)..8 * (32 + 2 * 64)]);
+        (&mut *CHARSET_4)[0..256].copy_from_slice(&TILESET[8 * (3 * 64)..8 * (32 + 3 * 64)]);
 
         // Clear animation counter
         for i in 0..MAP.len() {
@@ -120,7 +120,8 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         let mut animation_counter: u8 = 0;
 
         loop {
-            while vic2.raster_counter.read() != 251 {}
+            while vic2.raster_counter.read() > 0 {}
+            while vic2.raster_counter.read() < 251 {}
 
             set_screen_buffer(animation_counter, draw_to_screen_2);
 
@@ -171,6 +172,8 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 for i in 0..screen.len() {
                     screen[i] = MAP[i];
                 }
+
+                //screen.copy_from_slice(&MAP);
             }
 
             animation_counter += 1;
@@ -382,5 +385,11 @@ static mut MAP: [u8; 1000] = [
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
+    let vic2 = c64::vic2();
+    loop {
+        unsafe {
+            vic2.border_color.write(RED);
+            vic2.border_color.write(BLACK);
+        }
+    }
 }

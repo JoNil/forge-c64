@@ -1,12 +1,13 @@
 #![no_std]
 #![feature(start)]
 
-use core::hint::unreachable_unchecked;
+use core::{cell::Cell, hint::unreachable_unchecked};
 use mos_hardware::{
     c64,
     cia::GameController,
     vic2::{CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, GREEN, RED, YELLOW},
 };
+use volatile_register::RW;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 const RESOURCE_BIT: u8 = 0x10;
@@ -55,7 +56,7 @@ fn is_depositing_left(tile: u8) -> bool {
 
 fn clear_screen(screen: &mut [u8; 1000]) {
     for c in screen {
-        *c = 0x20;
+        *c = 0x00;
     }
 }
 
@@ -67,41 +68,24 @@ const CHARSET_2: *mut [u8; 2048] = 0xa800 as *mut [u8; 2048];
 const CHARSET_3: *mut [u8; 2048] = 0xb000 as *mut [u8; 2048];
 const CHARSET_4: *mut [u8; 2048] = 0xb800 as *mut [u8; 2048];
 
-fn set_screen_buffer(animation_counter: u8, draw_to_screen_2: bool) {
-    let vic2 = c64::vic2();
-
-    let bank = match (animation_counter, draw_to_screen_2) {
-        (0, false) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
-        (1, false) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
-        (2, false) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
-        (3, false) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
-        (0, true) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
-        (1, true) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
-        (2, true) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
-        (3, true) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
-        _ => unsafe { unreachable_unchecked() },
-    };
-
-    unsafe { vic2.screen_and_charset_bank.write(bank) };
-}
+static mut ANIMATION_COUNTER: Cell<u8> = Cell::new(0);
+static mut DRAW_TO_SCREEN_2: Cell<u8> = Cell::new(0);
+static mut NEW_FRAME: Cell<u8> = Cell::new(0);
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let vic2 = c64::vic2();
     let cia2 = c64::cia2();
 
-    let mut draw_to_screen_2 = false;
-
     unsafe {
-        clear_screen(&mut *SCREEN_1);
-        clear_screen(&mut *SCREEN_2);
-
         vic2.border_color.write(BLACK);
         vic2.background_color0.write(BLACK);
         vic2.background_color1.write(GRAY1);
         vic2.background_color2.write(YELLOW);
-
         vic2.control_x.modify(|v| v | ControlXFlags::MULTICOLOR);
+
+        clear_screen(&mut *SCREEN_1);
+        clear_screen(&mut *SCREEN_2);
 
         // Set VIC2 memory at 0x8000–0xBFFF
         cia2.data_direction_port_a.write(0b11);
@@ -112,48 +96,43 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         (&mut *CHARSET_3)[0..256].copy_from_slice(&TILESET[8 * (2 * 64)..8 * (32 + 2 * 64)]);
         (&mut *CHARSET_4)[0..256].copy_from_slice(&TILESET[8 * (3 * 64)..8 * (32 + 3 * 64)]);
 
+        set_screen_buffer();
+
         // Clear animation counter
         for i in 0..MAP.len() {
             MAP[i] &= ANIMATION_COUNTER_MASK;
         }
 
-        let mut animation_counter: u8 = 0;
+        c64::hardware_raster_irq(251);
 
         loop {
-            while vic2.raster_counter.read() > 0 {}
-            while vic2.raster_counter.read() < 251 {}
-
-            set_screen_buffer(animation_counter, draw_to_screen_2);
-
-            vic2.border_color.write(GREEN);
+            while NEW_FRAME.get() == 1 {}
 
             /*{
                 // Update map
 
-                if animation_counter == 0b1100_0000 {
-                    for x in 1u8..(MAP_WIDTH - 1) {
-                        for y in 1u8..(MAP_HEIGHT - 1) {
-                            let tile = read_map(x, y);
+                for x in 1u8..(MAP_WIDTH - 1) {
+                    for y in 1u8..(MAP_HEIGHT - 1) {
+                        let tile = read_map(x, y);
 
-                            if !has_resource(tile) {
-                                let down = read_map(x, y + 1);
-                                let up = read_map(x, y - 1);
-                                let left = read_map(x - 1, y);
-                                let right = read_map(x + 1, y);
+                        if !has_resource(tile) {
+                            let down = read_map(x, y + 1);
+                            let up = read_map(x, y - 1);
+                            let left = read_map(x - 1, y);
+                            let right = read_map(x + 1, y);
 
-                                if has_resource(down) && is_depositing_up(down) {
-                                    write_map(x, y, set_resource(tile));
-                                    write_map(x, y + 1, clear_resource(down));
-                                } else if has_resource(up) && is_depositing_down(up) {
-                                    write_map(x, y, set_resource(tile));
-                                    write_map(x, y - 1, clear_resource(up));
-                                } else if has_resource(left) && is_depositing_right(left) {
-                                    write_map(x, y, set_resource(tile));
-                                    write_map(x - 1, y, clear_resource(left));
-                                } else if has_resource(right) && is_depositing_left(right) {
-                                    write_map(x, y, set_resource(tile));
-                                    write_map(x + 1, y, clear_resource(right));
-                                }
+                            if has_resource(down) && is_depositing_up(down) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x, y + 1, clear_resource(down));
+                            } else if has_resource(up) && is_depositing_down(up) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x, y - 1, clear_resource(up));
+                            } else if has_resource(left) && is_depositing_right(left) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x - 1, y, clear_resource(left));
+                            } else if has_resource(right) && is_depositing_left(right) {
+                                write_map(x, y, set_resource(tile));
+                                write_map(x + 1, y, clear_resource(right));
                             }
                         }
                     }
@@ -163,22 +142,58 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             {
                 // Copy map to screen
 
-                let screen = if draw_to_screen_2 {
+                let screen = if DRAW_TO_SCREEN_2.get() == 1 {
                     &mut *SCREEN_2
                 } else {
                     &mut *SCREEN_1
                 };
 
                 screen.copy_from_slice(&MAP);
+                NEW_FRAME.set(1);
             }
-
-            animation_counter += 1;
-            if animation_counter == 4 {
-                animation_counter = 0;
-            }
-
-            vic2.border_color.write(BLACK);
         }
+    }
+}
+
+fn set_screen_buffer() {
+    let vic2 = c64::vic2();
+
+    let bank = match unsafe { (ANIMATION_COUNTER.get(), DRAW_TO_SCREEN_2.get()) } {
+        (0, 0) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
+        (1, 0) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
+        (2, 0) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
+        (3, 0) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
+        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
+        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
+        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
+        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
+        _ => unsafe { unreachable_unchecked() },
+    };
+
+    unsafe { vic2.screen_and_charset_bank.write(bank) };
+}
+
+#[no_mangle]
+pub extern "C" fn called_every_frame() {
+    unsafe {
+        let animation_counter = ANIMATION_COUNTER.get() + 1;
+        if animation_counter == 4 {
+            ANIMATION_COUNTER.set(0);
+        } else {
+            ANIMATION_COUNTER.set(animation_counter);
+        }
+
+        if NEW_FRAME.get() == 1 {
+            if DRAW_TO_SCREEN_2.get() == 1 {
+                DRAW_TO_SCREEN_2.set(0);
+            } else {
+                DRAW_TO_SCREEN_2.set(1);
+            }
+        }
+
+        set_screen_buffer();
+
+        NEW_FRAME.set(0);
     }
 }
 

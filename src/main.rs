@@ -5,9 +5,8 @@ use core::{cell::Cell, hint::unreachable_unchecked};
 use mos_hardware::{
     c64,
     cia::GameController,
-    vic2::{CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, GREEN, RED, YELLOW},
+    vic2::{CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, LIGHT_GREEN, RED, YELLOW},
 };
-use volatile_register::RW;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 const RESOURCE_BIT: u8 = 0x10;
@@ -175,7 +174,11 @@ fn set_screen_buffer() {
 
 #[no_mangle]
 pub extern "C" fn called_every_frame() {
+    let vic2 = c64::vic2();
+
     unsafe {
+        vic2.border_color.write(LIGHT_GREEN);
+
         let animation_counter = ANIMATION_COUNTER.get() + 1;
         if animation_counter == 4 {
             ANIMATION_COUNTER.set(0);
@@ -183,17 +186,19 @@ pub extern "C" fn called_every_frame() {
             ANIMATION_COUNTER.set(animation_counter);
         }
 
-        if NEW_FRAME.get() == 1 {
+        /*if NEW_FRAME.get() == 1 {
             if DRAW_TO_SCREEN_2.get() == 1 {
                 DRAW_TO_SCREEN_2.set(0);
             } else {
                 DRAW_TO_SCREEN_2.set(1);
             }
-        }
+        }*/
 
         set_screen_buffer();
 
         NEW_FRAME.set(0);
+
+        vic2.border_color.write(BLACK);
     }
 }
 

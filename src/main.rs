@@ -158,14 +158,14 @@ fn set_screen_buffer() {
     let vic2 = c64::vic2();
 
     let bank = match unsafe { (ANIMATION_COUNTER.get(), DRAW_TO_SCREEN_2.get()) } {
-        (0, 0) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
-        (1, 0) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
-        (2, 0) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
-        (3, 0) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
-        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
-        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
-        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
-        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
+        (0, 0) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
+        (1, 0) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
+        (2, 0) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
+        (3, 0) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
+        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
+        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
+        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
+        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
         _ => unsafe { unreachable_unchecked() },
     };
 
@@ -186,13 +186,13 @@ pub extern "C" fn called_every_frame() {
             ANIMATION_COUNTER.set(animation_counter);
         }
 
-        /*if NEW_FRAME.get() == 1 {
+        if NEW_FRAME.get() == 1 {
             if DRAW_TO_SCREEN_2.get() == 1 {
                 DRAW_TO_SCREEN_2.set(0);
             } else {
                 DRAW_TO_SCREEN_2.set(1);
             }
-        }*/
+        }
 
         set_screen_buffer();
 

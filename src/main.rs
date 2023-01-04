@@ -3,9 +3,10 @@
 
 use core::ptr::{read_volatile, write_volatile};
 
-extern "C" {
-    fn __chrout(c: u8);
-}
+use mos_hardware::{
+    c64,
+    vic2::{BLACK, GRAY1, YELLOW},
+};
 
 const SCREEN_1: *mut [u8; 1000] = 0x0400 as *mut [u8; 1000];
 const SCREEN_2: *mut [u8; 1000] = 0x3400 as *mut [u8; 1000];
@@ -95,14 +96,18 @@ fn is_depositing_left(tile: u8) -> bool {
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
+    let vic2 = c64::vic2();
+
     unsafe {
         clear_screen(&mut *SCREEN_1);
         clear_screen(&mut *SCREEN_2);
 
-        write_volatile(VIC_BGCOLOR, 0);
-        write_volatile(VIC_BORDER_COLOR, 0);
-        write_volatile(VIC_MULTI_COLOR_1, 11);
-        write_volatile(VIC_MULTI_COLOR_2, 7);
+        vic2.border_color.write(BLACK);
+        vic2.border_color.write(BLACK);
+
+        vic2.background_color1.write(GRAY1);
+        vic2.background_color2.write(YELLOW);
+
         write_volatile(VIC_CR2, read_volatile(VIC_CR2) | 0x10);
         write_volatile(VIC_MEMORY_PTRS, read_volatile(VIC_MEMORY_PTRS) | 0x0e);
 

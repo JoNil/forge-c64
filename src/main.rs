@@ -3,9 +3,11 @@
 
 use core::{cell::Cell, hint::unreachable_unchecked};
 use mos_hardware::{
-    c64,
+    c64::{self, COLOR_RAM},
     cia::GameController,
-    vic2::{CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, LIGHT_GREEN, RED, YELLOW},
+    vic2::{
+        CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, LIGHT_GREEN, LIGHT_RED, RED, YELLOW,
+    },
 };
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
@@ -94,6 +96,10 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         (&mut *CHARSET_2)[0..256].copy_from_slice(&TILESET[8 * (1 * 64)..8 * (32 + 1 * 64)]);
         (&mut *CHARSET_3)[0..256].copy_from_slice(&TILESET[8 * (2 * 64)..8 * (32 + 2 * 64)]);
         (&mut *CHARSET_4)[0..256].copy_from_slice(&TILESET[8 * (3 * 64)..8 * (32 + 3 * 64)]);
+
+        for i in 0..1000 {
+            COLOR_RAM.offset(i).write(LIGHT_RED);
+        }
 
         set_screen_buffer();
 

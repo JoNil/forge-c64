@@ -9,8 +9,8 @@ use mos_hardware::{
     c64::{self, COLOR_RAM},
     cia::GameController,
     vic2::{
-        CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_GREEN, LIGHT_RED, RED,
-        YELLOW,
+        CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_BLUE, LIGHT_GREEN,
+        LIGHT_RED, RED, YELLOW,
     },
 };
 
@@ -155,7 +155,11 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             {
                 // Copy map to screen
 
-                let screen = &mut *SCREEN_2;
+                let screen = if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
+                    &mut *SCREEN_2
+                } else {
+                    &mut *SCREEN_1
+                };
 
                 screen.copy_from_slice(&MAP);
             }
@@ -178,10 +182,22 @@ fn set_screen_buffer() {
         (1, 0) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
         (2, 0) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
         (3, 0) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
-        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
-        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
-        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
-        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
+        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
+        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
+        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
+        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
+        _ => unsafe { unreachable_unchecked() },
+    };
+
+    unsafe { vic2.screen_and_charset_bank.write(bank) };
+}
+
+fn set_text_charset() {
+    let vic2 = c64::vic2();
+
+    let bank = match unsafe { DRAW_TO_SCREEN_2.load(Ordering::SeqCst) } {
+        0 => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
+        1 => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
         _ => unsafe { unreachable_unchecked() },
     };
 
@@ -189,54 +205,64 @@ fn set_screen_buffer() {
 }
 
 #[no_mangle]
-pub extern "C" fn called_every_frame() {
+pub unsafe extern "C" fn called_every_frame() {
     let vic2 = c64::vic2();
 
     static mut FRAME_COUNT: u8 = 0;
 
-    unsafe {
-        vic2.border_color.write(LIGHT_GREEN);
+    //let raster_counter = vic2.raster_counter.read();
 
-        if FRAME_COUNT == 4 {
-            FRAME_COUNT = 0;
+    //if raster_counter == 239 {
+    //    vic2.border_color.write(LIGHT_BLUE);
+    //    vic2.raster_counter.write(247);
 
-            let animation_counter = ANIMATION_COUNTER.load(Ordering::SeqCst) + 1;
-            ANIMATION_COUNTER.store(
-                if animation_counter == 4 {
+    //set_text_charset();
+    //    vic2.border_color.write(BLACK);
+    //} else if raster_counter == 247 {
+    vic2.border_color.write(LIGHT_GREEN);
+
+    //vic2.raster_counter.write(239);
+
+    if FRAME_COUNT == 4 {
+        FRAME_COUNT = 0;
+
+        let animation_counter = ANIMATION_COUNTER.load(Ordering::SeqCst) + 1;
+        ANIMATION_COUNTER.store(
+            if animation_counter == 4 {
+                0
+            } else {
+                animation_counter
+            },
+            Ordering::SeqCst,
+        );
+
+        if animation_counter == 4 {
+            // Was the main loop too slow?
+            if NEW_FRAME.load(Ordering::SeqCst) == 0 {
+                loop {
+                    vic2.border_color.write(BROWN);
+                    vic2.border_color.write(BLACK);
+                }
+            }
+
+            NEW_FRAME.store(0, Ordering::SeqCst);
+
+            DRAW_TO_SCREEN_2.store(
+                if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
                     0
                 } else {
-                    animation_counter
+                    1
                 },
                 Ordering::SeqCst,
             );
-
-            if animation_counter == 4 {
-                // Was the main loop too slow?
-                if NEW_FRAME.load(Ordering::SeqCst) == 0 {
-                    loop {
-                        vic2.border_color.write(BROWN);
-                        vic2.border_color.write(BLACK);
-                    }
-                }
-
-                NEW_FRAME.store(0, Ordering::SeqCst);
-
-                DRAW_TO_SCREEN_2.store(
-                    if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
-                        0
-                    } else {
-                        1
-                    },
-                    Ordering::SeqCst,
-                );
-            }
-
-            set_screen_buffer();
         }
 
-        FRAME_COUNT += 1;
-        vic2.border_color.write(BLACK);
+        set_screen_buffer();
     }
+
+    FRAME_COUNT += 1;
+    vic2.border_color.write(BLACK);
+    //}
 }
 
 static TILESET: [u8; 2048] = [

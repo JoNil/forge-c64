@@ -1,6 +1,10 @@
 #![no_std]
 #![feature(start)]
 
+extern crate alloc;
+extern crate mos_alloc;
+
+use alloc::format;
 use core::{
     hint::unreachable_unchecked,
     sync::atomic::{AtomicU8, Ordering},
@@ -115,11 +119,16 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         for x in 0..MAP_WIDTH {
             write_map(x, MAP_HEIGHT - 1, 1);
         }
+        for x in 0..MAP_WIDTH {
+            write_map(x, MAP_HEIGHT - 2, 1);
+        }
 
-        c64::hardware_raster_irq(247);
+        c64::hardware_raster_irq(238);
 
         loop {
             while NEW_FRAME.load(Ordering::SeqCst) == 1 {}
+
+            let start = cia2.timer_a.read();
 
             {
                 // Update map
@@ -162,6 +171,11 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 };
 
                 screen.copy_from_slice(&MAP);
+
+                let end = cia2.timer_a.read();
+                let time = end - start;
+
+                let text = format!("{time}");
             }
 
             NEW_FRAME.store(1, Ordering::SeqCst);
@@ -196,73 +210,91 @@ fn set_text_charset() {
     let vic2 = c64::vic2();
 
     let bank = match unsafe { DRAW_TO_SCREEN_2.load(Ordering::SeqCst) } {
-        0 => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
-        1 => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
+        0 => CharsetBank::AT_1000.bits() | ScreenBank::AT_0C00.bits(),
+        1 => CharsetBank::AT_1000.bits() | ScreenBank::AT_0800.bits(),
         _ => unsafe { unreachable_unchecked() },
     };
 
     unsafe { vic2.screen_and_charset_bank.write(bank) };
 }
 
+static mut DUMMY: AtomicU8 = AtomicU8::new(0);
+
 #[no_mangle]
 pub unsafe extern "C" fn called_every_frame() {
     let vic2 = c64::vic2();
 
     static mut FRAME_COUNT: u8 = 0;
+    static mut STATE: u8 = 0;
 
-    //let raster_counter = vic2.raster_counter.read();
-
-    //if raster_counter == 239 {
-    //    vic2.border_color.write(LIGHT_BLUE);
-    //    vic2.raster_counter.write(247);
-
-    //set_text_charset();
-    //    vic2.border_color.write(BLACK);
-    //} else if raster_counter == 247 {
     vic2.border_color.write(LIGHT_GREEN);
 
-    //vic2.raster_counter.write(239);
-
-    if FRAME_COUNT == 4 {
-        FRAME_COUNT = 0;
-
-        let animation_counter = ANIMATION_COUNTER.load(Ordering::SeqCst) + 1;
-        ANIMATION_COUNTER.store(
-            if animation_counter == 4 {
-                0
-            } else {
-                animation_counter
-            },
-            Ordering::SeqCst,
-        );
-
-        if animation_counter == 4 {
-            // Was the main loop too slow?
-            if NEW_FRAME.load(Ordering::SeqCst) == 0 {
-                loop {
-                    vic2.border_color.write(BROWN);
-                    vic2.border_color.write(BLACK);
-                }
-            }
-
-            NEW_FRAME.store(0, Ordering::SeqCst);
-
-            DRAW_TO_SCREEN_2.store(
-                if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
-                    0
-                } else {
-                    1
-                },
+    if STATE == 0 {
+        for _ in 0u8..3 {
+            DUMMY.store(
+                DUMMY.load(Ordering::SeqCst).wrapping_add(1),
                 Ordering::SeqCst,
             );
         }
+        vic2.background_color0.write(BLACK);
+        vic2.background_color1.write(BLACK);
+        vic2.background_color2.write(BLACK);
+        set_text_charset();
+
+        vic2.control_x.modify(|v| v & !ControlXFlags::MULTICOLOR);
+
+        vic2.raster_counter.write(247);
+        STATE = 1;
+    } else if STATE == 1 {
+        vic2.raster_counter.write(238);
+        STATE = 0;
+
+        if FRAME_COUNT == 4 {
+            FRAME_COUNT = 0;
+
+            let animation_counter = ANIMATION_COUNTER.load(Ordering::SeqCst) + 1;
+            ANIMATION_COUNTER.store(
+                if animation_counter == 4 {
+                    0
+                } else {
+                    animation_counter
+                },
+                Ordering::SeqCst,
+            );
+
+            if animation_counter == 4 {
+                // Was the main loop too slow?
+                if NEW_FRAME.load(Ordering::SeqCst) == 0 {
+                    loop {
+                        vic2.border_color.write(BROWN);
+                        vic2.border_color.write(BLACK);
+                    }
+                }
+
+                NEW_FRAME.store(0, Ordering::SeqCst);
+
+                DRAW_TO_SCREEN_2.store(
+                    if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
+                        0
+                    } else {
+                        1
+                    },
+                    Ordering::SeqCst,
+                );
+            }
+        }
 
         set_screen_buffer();
+        vic2.border_color.write(BLACK);
+        vic2.background_color0.write(BLACK);
+        vic2.background_color1.write(GRAY1);
+        vic2.background_color2.write(YELLOW);
+        vic2.control_x.modify(|v| v | ControlXFlags::MULTICOLOR);
+
+        FRAME_COUNT += 1;
     }
 
-    FRAME_COUNT += 1;
     vic2.border_color.write(BLACK);
-    //}
 }
 
 static TILESET: [u8; 2048] = [

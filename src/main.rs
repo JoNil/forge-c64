@@ -9,7 +9,8 @@ use mos_hardware::{
     c64::{self, COLOR_RAM},
     cia::GameController,
     vic2::{
-        CharsetBank, ControlXFlags, ScreenBank, BLACK, GRAY1, LIGHT_GREEN, LIGHT_RED, RED, YELLOW,
+        CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_GREEN, LIGHT_RED, RED,
+        YELLOW,
     },
 };
 
@@ -206,8 +207,14 @@ pub extern "C" fn called_every_frame() {
             );
 
             if animation_counter == 4 {
-                // Wait for the main loop to be done with the new screen
-                while NEW_FRAME.load(Ordering::SeqCst) == 0 {}
+                // Was the main loop too slow?
+                if NEW_FRAME.load(Ordering::SeqCst) == 0 {
+                    loop {
+                        vic2.border_color.write(BROWN);
+                        vic2.border_color.write(BLACK);
+                    }
+                }
+
                 NEW_FRAME.store(0, Ordering::SeqCst);
 
                 DRAW_TO_SCREEN_2.store(

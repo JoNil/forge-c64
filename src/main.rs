@@ -1,7 +1,10 @@
 #![no_std]
 #![feature(start)]
 
-use core::{cell::Cell, hint::unreachable_unchecked};
+use core::{
+    hint::unreachable_unchecked,
+    sync::atomic::{AtomicU8, Ordering},
+};
 use mos_hardware::{
     c64::{self, COLOR_RAM},
     cia::GameController,
@@ -69,9 +72,9 @@ const CHARSET_2: *mut [u8; 2048] = 0xa800 as *mut [u8; 2048];
 const CHARSET_3: *mut [u8; 2048] = 0xb000 as *mut [u8; 2048];
 const CHARSET_4: *mut [u8; 2048] = 0xb800 as *mut [u8; 2048];
 
-static mut ANIMATION_COUNTER: Cell<u8> = Cell::new(0);
-static mut DRAW_TO_SCREEN_2: Cell<u8> = Cell::new(0);
-static mut NEW_FRAME: Cell<u8> = Cell::new(0);
+static mut ANIMATION_COUNTER: AtomicU8 = AtomicU8::new(0);
+static mut DRAW_TO_SCREEN_2: AtomicU8 = AtomicU8::new(0);
+static mut NEW_FRAME: AtomicU8 = AtomicU8::new(0);
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
@@ -111,7 +114,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         c64::hardware_raster_irq(251);
 
         loop {
-            while NEW_FRAME.get() == 1 {}
+            while NEW_FRAME.load(Ordering::SeqCst) == 1 {}
 
             {
                 // Update map
@@ -147,15 +150,12 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             {
                 // Copy map to screen
 
-                let screen = if DRAW_TO_SCREEN_2.get() == 1 {
-                    &mut *SCREEN_2
-                } else {
-                    &mut *SCREEN_1
-                };
+                let screen = &mut *SCREEN_2;
 
                 screen.copy_from_slice(&MAP);
-                NEW_FRAME.set(1);
             }
+
+            NEW_FRAME.store(1, Ordering::SeqCst);
         }
     }
 }
@@ -163,54 +163,67 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 fn set_screen_buffer() {
     let vic2 = c64::vic2();
 
-    let bank = match unsafe { (ANIMATION_COUNTER.get(), DRAW_TO_SCREEN_2.get()) } {
+    let bank = match unsafe {
+        (
+            ANIMATION_COUNTER.load(Ordering::SeqCst),
+            DRAW_TO_SCREEN_2.load(Ordering::SeqCst),
+        )
+    } {
         (0, 0) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
         (1, 0) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
         (2, 0) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
         (3, 0) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
-        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
-        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
-        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
-        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
+        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
+        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
+        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
+        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
         _ => unsafe { unreachable_unchecked() },
     };
 
     unsafe { vic2.screen_and_charset_bank.write(bank) };
 }
 
-static mut SKIP_FRAME: Cell<u8> = Cell::new(0);
-
 #[no_mangle]
 pub extern "C" fn called_every_frame() {
     let vic2 = c64::vic2();
 
+    static mut FRAME_COUNT: u8 = 0;
+
     unsafe {
         vic2.border_color.write(LIGHT_GREEN);
 
-        if SKIP_FRAME.get() == 0 {
-            SKIP_FRAME.set(1);
-            let animation_counter = ANIMATION_COUNTER.get() + 1;
-            if animation_counter == 4 {
-                ANIMATION_COUNTER.set(0);
-            } else {
-                ANIMATION_COUNTER.set(animation_counter);
-            }
+        if FRAME_COUNT == 4 {
+            FRAME_COUNT = 0;
 
-            if NEW_FRAME.get() == 1 {
-                if DRAW_TO_SCREEN_2.get() == 1 {
-                    DRAW_TO_SCREEN_2.set(0);
+            let animation_counter = ANIMATION_COUNTER.load(Ordering::SeqCst) + 1;
+            ANIMATION_COUNTER.store(
+                if animation_counter == 4 {
+                    0
                 } else {
-                    DRAW_TO_SCREEN_2.set(1);
-                }
+                    animation_counter
+                },
+                Ordering::SeqCst,
+            );
+
+            if animation_counter == 4 {
+                // Wait for the main loop to be done with the new screen
+                while NEW_FRAME.load(Ordering::SeqCst) == 0 {}
+                NEW_FRAME.store(0, Ordering::SeqCst);
+
+                DRAW_TO_SCREEN_2.store(
+                    if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
+                        0
+                    } else {
+                        1
+                    },
+                    Ordering::SeqCst,
+                );
             }
 
             set_screen_buffer();
-
-            NEW_FRAME.set(0);
-        } else {
-            SKIP_FRAME.set(0);
         }
 
+        FRAME_COUNT += 1;
         vic2.border_color.write(BLACK);
     }
 }

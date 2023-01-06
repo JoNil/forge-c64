@@ -112,7 +112,11 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             MAP[i] &= ANIMATION_COUNTER_MASK;
         }
 
-        c64::hardware_raster_irq(251);
+        for x in 0..MAP_WIDTH {
+            write_map(x, MAP_HEIGHT - 1, 1);
+        }
+
+        c64::hardware_raster_irq(247);
 
         loop {
             while NEW_FRAME.load(Ordering::SeqCst) == 1 {}

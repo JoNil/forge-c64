@@ -12,6 +12,7 @@ use core::{
 use mos_hardware::{
     c64::{self, COLOR_RAM},
     cia::GameController,
+    petscii::Petscii,
     vic2::{
         CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_BLUE, LIGHT_GREEN,
         LIGHT_RED, RED, YELLOW,
@@ -176,6 +177,13 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 let time = end - start;
 
                 let text = format!("{time}");
+                for (x, char) in text.chars().enumerate() {
+                    write_map(
+                        x as u8,
+                        MAP_HEIGHT - 1,
+                        Petscii::from_char(char).to_screen_code(),
+                    );
+                }
             }
 
             NEW_FRAME.store(1, Ordering::SeqCst);

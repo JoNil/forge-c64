@@ -14,8 +14,8 @@ use mos_hardware::{
     cia::GameController,
     petscii::Petscii,
     vic2::{
-        CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_BLUE, LIGHT_GREEN,
-        LIGHT_RED, RED, YELLOW,
+        CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_GREEN, LIGHT_RED, RED,
+        YELLOW,
     },
 };
 
@@ -126,10 +126,13 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
         c64::hardware_raster_irq(238);
 
+        // Start cia2 timer_a
+        cia2.control_a.write(0b10010001);
+
         loop {
             while NEW_FRAME.load(Ordering::SeqCst) == 1 {}
 
-            let start = cia2.timer_a.read();
+            let start = FRAME_COUNTER.load(Ordering::SeqCst) as u16;
 
             {
                 // Update map
@@ -173,7 +176,10 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
                 screen.copy_from_slice(&MAP);
 
-                let end = cia2.timer_a.read();
+                let mut end = FRAME_COUNTER.load(Ordering::SeqCst) as u16;
+                if end < start {
+                    end += 255;
+                }
                 let time = end - start;
 
                 let text = format!("{time}");
@@ -227,6 +233,7 @@ fn set_text_charset() {
 }
 
 static mut DUMMY: AtomicU8 = AtomicU8::new(0);
+static mut FRAME_COUNTER: AtomicU8 = AtomicU8::new(0);
 
 #[no_mangle]
 pub unsafe extern "C" fn called_every_frame() {
@@ -257,7 +264,7 @@ pub unsafe extern "C" fn called_every_frame() {
         vic2.raster_counter.write(238);
         STATE = 0;
 
-        if FRAME_COUNT == 4 {
+        if FRAME_COUNT == 5 {
             FRAME_COUNT = 0;
 
             let animation_counter = ANIMATION_COUNTER.load(Ordering::SeqCst) + 1;
@@ -300,6 +307,10 @@ pub unsafe extern "C" fn called_every_frame() {
         vic2.control_x.modify(|v| v | ControlXFlags::MULTICOLOR);
 
         FRAME_COUNT += 1;
+        FRAME_COUNTER.store(
+            FRAME_COUNTER.load(Ordering::SeqCst).wrapping_add(1),
+            Ordering::SeqCst,
+        );
     }
 
     vic2.border_color.write(BLACK);

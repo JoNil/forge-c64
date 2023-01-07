@@ -37,11 +37,27 @@ fn clear_resource(tile: u8) -> u8 {
 }
 
 fn read_map(x: u8, y: u8) -> u8 {
-    unsafe { *MAP.get_unchecked(((x as u16) + (y as u16) * (MAP_WIDTH as u16)) as usize) }
+    unsafe {
+        MAP.as_ptr()
+            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .read()
+    }
 }
 
 fn write_map(x: u8, y: u8, val: u8) {
-    unsafe { *MAP.get_unchecked_mut(((x as u16) + (y as u16) * (MAP_WIDTH as u16)) as usize) = val }
+    unsafe {
+        MAP.as_mut_ptr()
+            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .write(val);
+    }
+}
+
+fn write_map_color(x: u8, y: u8, color: u8) {
+    unsafe {
+        COLOR_RAM
+            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .write(color);
+    }
 }
 
 fn is_depositing_down(tile: u8) -> bool {
@@ -124,10 +140,11 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             write_map(x, MAP_HEIGHT - 2, 1);
         }
 
-        c64::hardware_raster_irq(238);
+        for x in 0..MAP_WIDTH {
+            write_map_color(x, MAP_HEIGHT - 1, RED);
+        }
 
-        // Start cia2 timer_a
-        cia2.control_a.write(0b10010001);
+        c64::hardware_raster_irq(239);
 
         loop {
             while NEW_FRAME.load(Ordering::SeqCst) == 1 {}
@@ -232,7 +249,6 @@ fn set_text_charset() {
     unsafe { vic2.screen_and_charset_bank.write(bank) };
 }
 
-static mut DUMMY: AtomicU8 = AtomicU8::new(0);
 static mut FRAME_COUNTER: AtomicU8 = AtomicU8::new(0);
 
 #[no_mangle]
@@ -242,26 +258,15 @@ pub unsafe extern "C" fn called_every_frame() {
     static mut FRAME_COUNT: u8 = 0;
     static mut STATE: u8 = 0;
 
-    vic2.border_color.write(LIGHT_GREEN);
-
     if STATE == 0 {
-        for _ in 0u8..3 {
-            DUMMY.store(
-                DUMMY.load(Ordering::SeqCst).wrapping_add(1),
-                Ordering::SeqCst,
-            );
-        }
-        vic2.background_color0.write(BLACK);
-        vic2.background_color1.write(BLACK);
-        vic2.background_color2.write(BLACK);
         set_text_charset();
-
-        vic2.control_x.modify(|v| v & !ControlXFlags::MULTICOLOR);
 
         vic2.raster_counter.write(247);
         STATE = 1;
     } else if STATE == 1 {
-        vic2.raster_counter.write(238);
+        vic2.border_color.write(LIGHT_GREEN);
+
+        vic2.raster_counter.write(239);
         STATE = 0;
 
         if FRAME_COUNT == 5 {
@@ -300,20 +305,15 @@ pub unsafe extern "C" fn called_every_frame() {
         }
 
         set_screen_buffer();
-        vic2.border_color.write(BLACK);
-        vic2.background_color0.write(BLACK);
-        vic2.background_color1.write(GRAY1);
-        vic2.background_color2.write(YELLOW);
-        vic2.control_x.modify(|v| v | ControlXFlags::MULTICOLOR);
 
         FRAME_COUNT += 1;
         FRAME_COUNTER.store(
             FRAME_COUNTER.load(Ordering::SeqCst).wrapping_add(1),
             Ordering::SeqCst,
         );
-    }
 
-    vic2.border_color.write(BLACK);
+        vic2.border_color.write(BLACK);
+    }
 }
 
 static TILESET: [u8; 2048] = [

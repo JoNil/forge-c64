@@ -144,7 +144,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             write_map_color(x, MAP_HEIGHT - 1, RED);
         }
 
-        c64::hardware_raster_irq(239);
+        c64::hardware_raster_irq(247);
 
         loop {
             while NEW_FRAME.load(Ordering::SeqCst) == 1 {}
@@ -237,18 +237,6 @@ fn set_screen_buffer() {
     unsafe { vic2.screen_and_charset_bank.write(bank) };
 }
 
-fn set_text_charset() {
-    let vic2 = c64::vic2();
-
-    let bank = match unsafe { DRAW_TO_SCREEN_2.load(Ordering::SeqCst) } {
-        0 => CharsetBank::AT_1000.bits() | ScreenBank::AT_0C00.bits(),
-        1 => CharsetBank::AT_1000.bits() | ScreenBank::AT_0800.bits(),
-        _ => unsafe { unreachable_unchecked() },
-    };
-
-    unsafe { vic2.screen_and_charset_bank.write(bank) };
-}
-
 static mut FRAME_COUNTER: AtomicU8 = AtomicU8::new(0);
 
 #[no_mangle]
@@ -256,14 +244,16 @@ pub unsafe extern "C" fn called_every_frame() {
     let vic2 = c64::vic2();
 
     static mut FRAME_COUNT: u8 = 0;
-    static mut STATE: u8 = 0;
+    static mut STATE: u8 = 1;
+    static mut NEXT_TEXT_CHARSET: u8 = 0;
+
+    // Always set this as first thing we do. This enables us to to it in time for the first char on the char line
+    vic2.screen_and_charset_bank.write(NEXT_TEXT_CHARSET);
 
     if STATE == 0 {
-        set_text_charset();
-
         vic2.raster_counter.write(247);
         STATE = 1;
-    } else if STATE == 1 {
+    } else {
         vic2.border_color.write(LIGHT_GREEN);
 
         vic2.raster_counter.write(239);
@@ -302,6 +292,12 @@ pub unsafe extern "C" fn called_every_frame() {
                     Ordering::SeqCst,
                 );
             }
+        }
+
+        if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 0 {
+            NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0C00.bits();
+        } else {
+            NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0800.bits();
         }
 
         set_screen_buffer();

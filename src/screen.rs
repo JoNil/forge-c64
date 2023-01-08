@@ -1,5 +1,5 @@
+use crate::utils::read;
 use core::hint::unreachable_unchecked;
-
 use mos_hardware::{
     c64,
     vic2::{CharsetBank, ScreenBank},
@@ -18,13 +18,13 @@ pub static mut ANIMATION_COUNTER: u8 = 0;
 pub fn set_vic2_buffer() {
     let vic2 = c64::vic2();
 
-    let bank = match unsafe { ANIMATION_COUNTER } {
+    let bank = match read!(ANIMATION_COUNTER) {
         0 => CharsetBank::AT_2000.bits(),
         1 => CharsetBank::AT_2800.bits(),
         2 => CharsetBank::AT_3000.bits(),
         3 => CharsetBank::AT_3800.bits(),
         _ => unsafe { unreachable_unchecked() },
-    } | match unsafe { DRAW_TO_SCREEN_2 } {
+    } | match read!(DRAW_TO_SCREEN_2) {
         0 => ScreenBank::AT_0C00.bits(),
         1 => ScreenBank::AT_0800.bits(),
         _ => unsafe { unreachable_unchecked() },
@@ -35,7 +35,7 @@ pub fn set_vic2_buffer() {
 
 pub fn current() -> &'static mut [u8; 1000] {
     unsafe {
-        if DRAW_TO_SCREEN_2 == 1 {
+        if read!(DRAW_TO_SCREEN_2) > 0 {
             &mut *SCREEN_2
         } else {
             &mut *SCREEN_1

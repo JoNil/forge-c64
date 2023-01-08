@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(start)]
 
-use core::hint::unreachable_unchecked;
 use map::MAP;
 use mos_hardware::{
     c64::{self, COLOR_RAM},
@@ -19,6 +18,7 @@ mod map;
 mod screen;
 mod text;
 mod tileset;
+mod utils;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 const RESOURCE_BIT: u8 = 0x10;
@@ -132,9 +132,9 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         c64::hardware_raster_irq(247);
 
         loop {
-            while (&NEW_FRAME as *const u8).read_volatile() > 0 {}
+            while read!(NEW_FRAME) > 0 {}
 
-            let start = (&FRAME_COUNTER as *const u8).read_volatile() as u16;
+            let start = read!(FRAME_COUNTER) as u16;
 
             {
                 // Update map
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn called_every_frame() {
         if FRAME_COUNT == 5 {
             FRAME_COUNT = 0;
 
-            let animation_counter = screen::ANIMATION_COUNTER + 1;
+            let animation_counter = read!(screen::ANIMATION_COUNTER) + 1;
             screen::ANIMATION_COUNTER = if animation_counter == 4 {
                 0
             } else {
@@ -228,7 +228,7 @@ pub unsafe extern "C" fn called_every_frame() {
 
             if animation_counter == 4 {
                 // Was the main loop too slow?
-                if NEW_FRAME == 0 {
+                if read!(NEW_FRAME) == 0 {
                     loop {
                         vic2.border_color.write(BROWN);
                         vic2.border_color.write(BLACK);
@@ -237,11 +237,15 @@ pub unsafe extern "C" fn called_every_frame() {
 
                 NEW_FRAME = 0;
 
-                screen::DRAW_TO_SCREEN_2 = if screen::DRAW_TO_SCREEN_2 == 1 { 0 } else { 1 };
+                screen::DRAW_TO_SCREEN_2 = if read!(screen::DRAW_TO_SCREEN_2) > 0 {
+                    0
+                } else {
+                    1
+                };
             }
         }
 
-        if screen::DRAW_TO_SCREEN_2 == 0 {
+        if read!(screen::DRAW_TO_SCREEN_2) == 0 {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0C00.bits();
         } else {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0800.bits();

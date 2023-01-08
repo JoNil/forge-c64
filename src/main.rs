@@ -12,9 +12,12 @@ use mos_hardware::{
         YELLOW,
     },
 };
+use screen::{CHARSET_1, CHARSET_2, CHARSET_3, CHARSET_4, SCREEN_1, SCREEN_2};
 use tileset::TILESET;
 
 mod map;
+mod screen;
+mod text;
 mod tileset;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
@@ -78,22 +81,6 @@ fn is_depositing_left(tile: u8) -> bool {
     tile == 1 || tile == 5 || tile == 9
 }
 
-fn clear_screen(screen: &mut [u8; 1000]) {
-    for c in screen {
-        *c = 0x00;
-    }
-}
-
-const SCREEN_1: *mut [u8; 1000] = 0x8800 as *mut [u8; 1000];
-const SCREEN_2: *mut [u8; 1000] = 0x8C00 as *mut [u8; 1000];
-// 0x9000-0x9fff, Free for cpu, vic sees original chars
-const CHARSET_1: *mut [u8; 2048] = 0xa000 as *mut [u8; 2048];
-const CHARSET_2: *mut [u8; 2048] = 0xa800 as *mut [u8; 2048];
-const CHARSET_3: *mut [u8; 2048] = 0xb000 as *mut [u8; 2048];
-const CHARSET_4: *mut [u8; 2048] = 0xb800 as *mut [u8; 2048];
-
-static mut ANIMATION_COUNTER: u8 = 0;
-static mut DRAW_TO_SCREEN_2: u8 = 0;
 static mut NEW_FRAME: u8 = 0;
 
 #[start]
@@ -108,8 +95,8 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         vic2.background_color2.write(YELLOW);
         vic2.control_x.modify(|v| v | ControlXFlags::MULTICOLOR);
 
-        clear_screen(&mut *SCREEN_1);
-        clear_screen(&mut *SCREEN_2);
+        screen::clear(&mut *SCREEN_1);
+        screen::clear(&mut *SCREEN_2);
 
         // Set VIC2 memory at 0x8000–0xBFFF
         cia2.data_direction_port_a.write(0b11);
@@ -124,7 +111,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             COLOR_RAM.offset(i).write(LIGHT_RED);
         }
 
-        set_screen_buffer();
+        screen::set_vic2_buffer();
 
         // Clear animation counter
         for i in 0..MAP.len() {
@@ -183,12 +170,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             {
                 // Copy map to screen
 
-                let screen = if DRAW_TO_SCREEN_2 == 1 {
-                    &mut *SCREEN_2
-                } else {
-                    &mut *SCREEN_1
-                };
-
+                let screen = screen::current();
                 screen.copy_from_slice(&MAP);
 
                 let mut end = (&FRAME_COUNTER as *const u8).read_volatile() as u16;
@@ -210,24 +192,6 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             NEW_FRAME = 1;
         }
     }
-}
-
-fn set_screen_buffer() {
-    let vic2 = c64::vic2();
-
-    let bank = match unsafe { ANIMATION_COUNTER } {
-        0 => CharsetBank::AT_2000.bits(),
-        1 => CharsetBank::AT_2800.bits(),
-        2 => CharsetBank::AT_3000.bits(),
-        3 => CharsetBank::AT_3800.bits(),
-        _ => unsafe { unreachable_unchecked() },
-    } | match unsafe { DRAW_TO_SCREEN_2 } {
-        0 => ScreenBank::AT_0C00.bits(),
-        1 => ScreenBank::AT_0800.bits(),
-        _ => unsafe { unreachable_unchecked() },
-    };
-
-    unsafe { vic2.screen_and_charset_bank.write(bank) };
 }
 
 static mut FRAME_COUNTER: u8 = 0;
@@ -255,8 +219,8 @@ pub unsafe extern "C" fn called_every_frame() {
         if FRAME_COUNT == 5 {
             FRAME_COUNT = 0;
 
-            let animation_counter = ANIMATION_COUNTER + 1;
-            ANIMATION_COUNTER = if animation_counter == 4 {
+            let animation_counter = screen::ANIMATION_COUNTER + 1;
+            screen::ANIMATION_COUNTER = if animation_counter == 4 {
                 0
             } else {
                 animation_counter
@@ -273,17 +237,17 @@ pub unsafe extern "C" fn called_every_frame() {
 
                 NEW_FRAME = 0;
 
-                DRAW_TO_SCREEN_2 = if DRAW_TO_SCREEN_2 == 1 { 0 } else { 1 };
+                screen::DRAW_TO_SCREEN_2 = if screen::DRAW_TO_SCREEN_2 == 1 { 0 } else { 1 };
             }
         }
 
-        if DRAW_TO_SCREEN_2 == 0 {
+        if screen::DRAW_TO_SCREEN_2 == 0 {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0C00.bits();
         } else {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0800.bits();
         }
 
-        set_screen_buffer();
+        screen::set_vic2_buffer();
 
         FRAME_COUNT += 1;
         FRAME_COUNTER += 1;

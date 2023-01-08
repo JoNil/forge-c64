@@ -180,7 +180,9 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 // Copy map to screen
                 let screen = screen::current();
                 (*screen)[0..960].copy_from_slice(&MAP[0..960]);
+            }
 
+            {
                 let mut end = FRAME_COUNTER.get() as u16;
                 if end < start {
                     end += 255;

@@ -225,7 +225,7 @@ pub unsafe extern "C" fn called_every_frame() {
                 animation_counter
             });
 
-            if animation_counter == 4 {
+            if animation_counter == 3 {
                 // Was the main loop too slow?
                 if NEW_FRAME.get() == 0 {
                     loop {

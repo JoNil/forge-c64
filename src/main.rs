@@ -1,10 +1,6 @@
 #![no_std]
 #![feature(start)]
 
-extern crate alloc;
-extern crate mos_alloc;
-
-use alloc::format;
 use core::hint::unreachable_unchecked;
 use map::MAP;
 use mos_hardware::{
@@ -201,14 +197,14 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 }
                 let time = end - start;
 
-                let text = format!("{time}");
+                /*let text = format!("{time}");
                 for (x, char) in text.chars().enumerate() {
                     write_map(
                         x as u8,
                         MAP_HEIGHT - 1,
                         Petscii::from_char(char).to_screen_code(),
                     );
-                }
+                }*/
             }
 
             NEW_FRAME = 1;

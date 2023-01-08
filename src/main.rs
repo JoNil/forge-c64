@@ -251,7 +251,7 @@ pub unsafe extern "C" fn called_every_frame() {
         screen::set_vic2_buffer();
 
         FRAME_COUNT += 1;
-        FRAME_COUNTER.set(FRAME_COUNTER.get() + 1);
+        *FRAME_COUNTER.as_ptr() += 1;
 
         vic2.border_color.write(BLACK);
     }

@@ -5,21 +5,24 @@ use map::MAP;
 use mos_hardware::{
     c64::{self, COLOR_RAM},
     cia::GameController,
-    petscii::Petscii,
     vic2::{
         CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_GREEN, LIGHT_RED, RED,
         YELLOW,
     },
 };
-use screen::{CHARSET_1, CHARSET_2, CHARSET_3, CHARSET_4, SCREEN_1, SCREEN_2};
+use screen::{
+    CHARSET_1, CHARSET_2, CHARSET_3, CHARSET_4, SCREEN_1, SCREEN_2, TEXT_SCREEN_1, TEXT_SCREEN_2,
+};
+use text_writer::MapTextWriter;
 use tileset::TILESET;
+use ufmt::uwrite;
 use vcell::VolatileCell;
 
 use crate::screen::{ANIMATION_COUNTER, DRAW_TO_SCREEN_2};
 
 mod map;
 mod screen;
-mod text;
+mod text_writer;
 mod tileset;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
@@ -99,6 +102,8 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
         screen::clear(&mut *SCREEN_1);
         screen::clear(&mut *SCREEN_2);
+        screen::clear_text(&mut *TEXT_SCREEN_1);
+        screen::clear_text(&mut *TEXT_SCREEN_2);
 
         // Set VIC2 memory at 0x8000–0xBFFF
         cia2.data_direction_port_a.write(0b11);
@@ -121,9 +126,6 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         }
 
         for x in 0..MAP_WIDTH {
-            write_map(x, MAP_HEIGHT - 1, 1);
-        }
-        for x in 0..MAP_WIDTH {
             write_map(x, MAP_HEIGHT - 2, 1);
         }
 
@@ -135,6 +137,10 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
         loop {
             while NEW_FRAME.get() > 0 {}
+
+            let mut w = MapTextWriter::new();
+
+            screen::clear_text(&mut *screen::current_text());
 
             let start = FRAME_COUNTER.get() as u16;
 
@@ -171,24 +177,16 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
             {
                 // Copy map to screen
-
                 let screen = screen::current();
-                screen.copy_from_slice(&MAP);
+                (*screen)[0..960].copy_from_slice(&MAP[0..960]);
 
                 let mut end = FRAME_COUNTER.get() as u16;
                 if end < start {
                     end += 255;
                 }
                 let time = end - start;
-
-                /*let text = format!("{time}");
-                for (x, char) in text.chars().enumerate() {
-                    write_map(
-                        x as u8,
-                        MAP_HEIGHT - 1,
-                        Petscii::from_char(char).to_screen_code(),
-                    );
-                }*/
+                uwrite!(&mut w, "{}", time).ok();
+                uwrite!(&mut w, " HELLO WORLD").ok();
             }
 
             NEW_FRAME.set(1);

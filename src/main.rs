@@ -13,12 +13,14 @@ use mos_hardware::{
 };
 use screen::{CHARSET_1, CHARSET_2, CHARSET_3, CHARSET_4, SCREEN_1, SCREEN_2};
 use tileset::TILESET;
+use vcell::VolatileCell;
+
+use crate::screen::{ANIMATION_COUNTER, DRAW_TO_SCREEN_2};
 
 mod map;
 mod screen;
 mod text;
 mod tileset;
-mod utils;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 const RESOURCE_BIT: u8 = 0x10;
@@ -81,7 +83,7 @@ fn is_depositing_left(tile: u8) -> bool {
     tile == 1 || tile == 5 || tile == 9
 }
 
-static mut NEW_FRAME: u8 = 0;
+static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
@@ -132,9 +134,9 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         c64::hardware_raster_irq(247);
 
         loop {
-            while read!(NEW_FRAME) > 0 {}
+            while NEW_FRAME.get() > 0 {}
 
-            let start = read!(FRAME_COUNTER) as u16;
+            let start = FRAME_COUNTER.get() as u16;
 
             {
                 // Update map
@@ -173,7 +175,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 let screen = screen::current();
                 screen.copy_from_slice(&MAP);
 
-                let mut end = (&FRAME_COUNTER as *const u8).read_volatile() as u16;
+                let mut end = FRAME_COUNTER.get() as u16;
                 if end < start {
                     end += 255;
                 }
@@ -189,12 +191,12 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 }*/
             }
 
-            NEW_FRAME = 1;
+            NEW_FRAME.set(1);
         }
     }
 }
 
-static mut FRAME_COUNTER: u8 = 0;
+static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 #[no_mangle]
 pub unsafe extern "C" fn called_every_frame() {
@@ -219,33 +221,28 @@ pub unsafe extern "C" fn called_every_frame() {
         if FRAME_COUNT == 5 {
             FRAME_COUNT = 0;
 
-            let animation_counter = read!(screen::ANIMATION_COUNTER) + 1;
-            screen::ANIMATION_COUNTER = if animation_counter == 4 {
+            let animation_counter = ANIMATION_COUNTER.get() + 1;
+            ANIMATION_COUNTER.set(if animation_counter == 4 {
                 0
             } else {
                 animation_counter
-            };
+            });
 
             if animation_counter == 4 {
                 // Was the main loop too slow?
-                if read!(NEW_FRAME) == 0 {
+                if NEW_FRAME.get() == 0 {
                     loop {
                         vic2.border_color.write(BROWN);
                         vic2.border_color.write(BLACK);
                     }
                 }
 
-                NEW_FRAME = 0;
-
-                screen::DRAW_TO_SCREEN_2 = if read!(screen::DRAW_TO_SCREEN_2) > 0 {
-                    0
-                } else {
-                    1
-                };
+                NEW_FRAME.set(0);
+                DRAW_TO_SCREEN_2.set(if DRAW_TO_SCREEN_2.get() > 0 { 0 } else { 1 });
             }
         }
 
-        if read!(screen::DRAW_TO_SCREEN_2) == 0 {
+        if DRAW_TO_SCREEN_2.get() == 0 {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0C00.bits();
         } else {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0800.bits();
@@ -254,7 +251,7 @@ pub unsafe extern "C" fn called_every_frame() {
         screen::set_vic2_buffer();
 
         FRAME_COUNT += 1;
-        FRAME_COUNTER += 1;
+        FRAME_COUNTER.set(FRAME_COUNTER.get() + 1);
 
         vic2.border_color.write(BLACK);
     }

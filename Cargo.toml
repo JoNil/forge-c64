@@ -17,3 +17,4 @@ codegen-units = 1
 
 [dependencies]
 mos-hardware = { git = "https://github.com/mlund/mos-hardware", branch = "main" }
+vcell = "0.1"

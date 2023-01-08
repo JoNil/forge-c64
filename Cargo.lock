@@ -91,6 +91,7 @@ name = "forge-c64"
 version = "0.1.0"
 dependencies = [
  "mos-hardware",
+ "vcell",
 ]
 
 [[package]]

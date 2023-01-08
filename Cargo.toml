@@ -18,3 +18,4 @@ codegen-units = 1
 [dependencies]
 mos-alloc = "0.2"
 mos-hardware = { git = "https://github.com/mlund/mos-hardware", branch = "main" }
+volatile-register = "0.2"

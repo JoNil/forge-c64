@@ -92,6 +92,7 @@ version = "0.1.0"
 dependencies = [
  "mos-alloc",
  "mos-hardware",
+ "volatile-register",
 ]
 
 [[package]]

@@ -5,10 +5,7 @@ extern crate alloc;
 extern crate mos_alloc;
 
 use alloc::format;
-use core::{
-    hint::unreachable_unchecked,
-    sync::atomic::{AtomicU8, Ordering},
-};
+use core::hint::unreachable_unchecked;
 use mos_hardware::{
     c64::{self, COLOR_RAM},
     cia::GameController,
@@ -18,6 +15,7 @@ use mos_hardware::{
         YELLOW,
     },
 };
+use volatile_register::RW;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 const RESOURCE_BIT: u8 = 0x10;
@@ -94,9 +92,9 @@ const CHARSET_2: *mut [u8; 2048] = 0xa800 as *mut [u8; 2048];
 const CHARSET_3: *mut [u8; 2048] = 0xb000 as *mut [u8; 2048];
 const CHARSET_4: *mut [u8; 2048] = 0xb800 as *mut [u8; 2048];
 
-static mut ANIMATION_COUNTER: AtomicU8 = AtomicU8::new(0);
-static mut DRAW_TO_SCREEN_2: AtomicU8 = AtomicU8::new(0);
-static mut NEW_FRAME: AtomicU8 = AtomicU8::new(0);
+static mut ANIMATION_COUNTER: u8 = 0;
+static mut DRAW_TO_SCREEN_2: u8 = 0;
+static mut NEW_FRAME: u8 = 0;
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
@@ -147,9 +145,9 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         c64::hardware_raster_irq(247);
 
         loop {
-            while NEW_FRAME.load(Ordering::SeqCst) == 1 {}
+            while (&NEW_FRAME as *const u8).read_volatile() > 0 {}
 
-            let start = FRAME_COUNTER.load(Ordering::SeqCst) as u16;
+            let start = (&FRAME_COUNTER as *const u8).read_volatile() as u16;
 
             {
                 // Update map
@@ -185,7 +183,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             {
                 // Copy map to screen
 
-                let screen = if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
+                let screen = if DRAW_TO_SCREEN_2 == 1 {
                     &mut *SCREEN_2
                 } else {
                     &mut *SCREEN_1
@@ -193,7 +191,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
                 screen.copy_from_slice(&MAP);
 
-                let mut end = FRAME_COUNTER.load(Ordering::SeqCst) as u16;
+                let mut end = (&FRAME_COUNTER as *const u8).read_volatile() as u16;
                 if end < start {
                     end += 255;
                 }
@@ -209,7 +207,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 }
             }
 
-            NEW_FRAME.store(1, Ordering::SeqCst);
+            NEW_FRAME = 1;
         }
     }
 }
@@ -217,27 +215,22 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 fn set_screen_buffer() {
     let vic2 = c64::vic2();
 
-    let bank = match unsafe {
-        (
-            ANIMATION_COUNTER.load(Ordering::SeqCst),
-            DRAW_TO_SCREEN_2.load(Ordering::SeqCst),
-        )
-    } {
-        (0, 0) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0C00.bits(),
-        (1, 0) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0C00.bits(),
-        (2, 0) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0C00.bits(),
-        (3, 0) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0C00.bits(),
-        (0, 1) => CharsetBank::AT_2000.bits() | ScreenBank::AT_0800.bits(),
-        (1, 1) => CharsetBank::AT_2800.bits() | ScreenBank::AT_0800.bits(),
-        (2, 1) => CharsetBank::AT_3000.bits() | ScreenBank::AT_0800.bits(),
-        (3, 1) => CharsetBank::AT_3800.bits() | ScreenBank::AT_0800.bits(),
+    let bank = match unsafe { ANIMATION_COUNTER } {
+        0 => CharsetBank::AT_2000.bits(),
+        1 => CharsetBank::AT_2800.bits(),
+        2 => CharsetBank::AT_3000.bits(),
+        3 => CharsetBank::AT_3800.bits(),
+        _ => unsafe { unreachable_unchecked() },
+    } | match unsafe { DRAW_TO_SCREEN_2 } {
+        0 => ScreenBank::AT_0C00.bits(),
+        1 => ScreenBank::AT_0800.bits(),
         _ => unsafe { unreachable_unchecked() },
     };
 
     unsafe { vic2.screen_and_charset_bank.write(bank) };
 }
 
-static mut FRAME_COUNTER: AtomicU8 = AtomicU8::new(0);
+static mut FRAME_COUNTER: u8 = 0;
 
 #[no_mangle]
 pub unsafe extern "C" fn called_every_frame() {
@@ -262,39 +255,29 @@ pub unsafe extern "C" fn called_every_frame() {
         if FRAME_COUNT == 5 {
             FRAME_COUNT = 0;
 
-            let animation_counter = ANIMATION_COUNTER.load(Ordering::SeqCst) + 1;
-            ANIMATION_COUNTER.store(
-                if animation_counter == 4 {
-                    0
-                } else {
-                    animation_counter
-                },
-                Ordering::SeqCst,
-            );
+            let animation_counter = ANIMATION_COUNTER + 1;
+            ANIMATION_COUNTER = if animation_counter == 4 {
+                0
+            } else {
+                animation_counter
+            };
 
             if animation_counter == 4 {
                 // Was the main loop too slow?
-                if NEW_FRAME.load(Ordering::SeqCst) == 0 {
+                if NEW_FRAME == 0 {
                     loop {
                         vic2.border_color.write(BROWN);
                         vic2.border_color.write(BLACK);
                     }
                 }
 
-                NEW_FRAME.store(0, Ordering::SeqCst);
+                NEW_FRAME = 0;
 
-                DRAW_TO_SCREEN_2.store(
-                    if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 1 {
-                        0
-                    } else {
-                        1
-                    },
-                    Ordering::SeqCst,
-                );
+                DRAW_TO_SCREEN_2 = if DRAW_TO_SCREEN_2 == 1 { 0 } else { 1 };
             }
         }
 
-        if DRAW_TO_SCREEN_2.load(Ordering::SeqCst) == 0 {
+        if DRAW_TO_SCREEN_2 == 0 {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0C00.bits();
         } else {
             NEXT_TEXT_CHARSET = CharsetBank::AT_1000.bits() | ScreenBank::AT_0800.bits();
@@ -303,10 +286,7 @@ pub unsafe extern "C" fn called_every_frame() {
         set_screen_buffer();
 
         FRAME_COUNT += 1;
-        FRAME_COUNTER.store(
-            FRAME_COUNTER.load(Ordering::SeqCst).wrapping_add(1),
-            Ordering::SeqCst,
-        );
+        FRAME_COUNTER += 1;
 
         vic2.border_color.write(BLACK);
     }

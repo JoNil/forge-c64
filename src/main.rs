@@ -87,6 +87,7 @@ fn is_depositing_left(tile: u8) -> bool {
 }
 
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
+static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
@@ -193,8 +194,6 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         }
     }
 }
-
-static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 #[no_mangle]
 pub unsafe extern "C" fn called_every_frame() {

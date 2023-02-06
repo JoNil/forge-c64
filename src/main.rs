@@ -11,19 +11,20 @@ use mos_hardware::{
     },
 };
 use screen::{
-    CHARSET_1, CHARSET_2, CHARSET_3, CHARSET_4, SCREEN_1, SCREEN_2, TEXT_SCREEN_1, TEXT_SCREEN_2,
+    ANIMATION_COUNTER, CHARSET_1, CHARSET_2, CHARSET_3, CHARSET_4, DRAW_TO_SCREEN_2, SCREEN_1,
+    SCREEN_2, TEXT_SCREEN_1, TEXT_SCREEN_2,
 };
 use text_writer::MapTextWriter;
 use tileset::TILESET;
 use ufmt::uwrite;
 use vcell::VolatileCell;
 
-use crate::screen::{ANIMATION_COUNTER, DRAW_TO_SCREEN_2};
-
 mod map;
 mod screen;
 mod text_writer;
 mod tileset;
+
+const SCRATCH: *mut [u8; 4096] = (0x9000) as *mut [u8; 4096];
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 const RESOURCE_BIT: u8 = 0x10;
@@ -42,27 +43,23 @@ fn clear_resource(tile: u8) -> u8 {
     tile & (!RESOURCE_BIT)
 }
 
-fn read_map(x: u8, y: u8) -> u8 {
+fn read_map(offset: u16) -> u8 {
+    unsafe { MAP.as_ptr().offset(offset as isize).read() }
+}
+
+fn read_scratch(offset: u16) -> u8 {
+    unsafe { (SCRATCH as *const u8).offset(offset as isize).read() }
+}
+
+fn write_map(offset: u16, val: u8) {
     unsafe {
-        MAP.as_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
-            .read()
+        MAP.as_mut_ptr().offset(offset as isize).write(val);
     }
 }
 
-fn write_map(x: u8, y: u8, val: u8) {
+fn write_map_color(offset: u16, color: u8) {
     unsafe {
-        MAP.as_mut_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
-            .write(val);
-    }
-}
-
-fn write_map_color(x: u8, y: u8, color: u8) {
-    unsafe {
-        COLOR_RAM
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
-            .write(color);
+        COLOR_RAM.offset(offset as isize).write(color);
     }
 }
 
@@ -84,6 +81,21 @@ fn is_dir_left(tile: u8) -> bool {
 
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
 static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
+
+#[inline(never)]
+fn update_map() {
+    let mut offset = 0;
+
+    for y in 0u8..(MAP_HEIGHT - 1) {
+        for x in 0u8..MAP_WIDTH {
+            offset += 1;
+            let tile = read_map(offset);
+            if tile & 0b11111 > 0 {
+                write_map(offset, 16);
+            }
+        }
+    }
+}
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
@@ -122,12 +134,13 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             MAP[i] &= ANIMATION_COUNTER_MASK;
         }
 
-        for x in 0..MAP_WIDTH {
-            write_map(x, MAP_HEIGHT - 2, 1);
-        }
-
-        for x in 0..MAP_WIDTH {
-            write_map_color(x, MAP_HEIGHT - 1, RED);
+        {
+            let mut offset = MAP_WIDTH as u16 * (MAP_HEIGHT - 2) as u16;
+            for _ in 0..MAP_WIDTH {
+                write_map(offset, 1);
+                write_map_color(offset, RED);
+                offset += 1;
+            }
         }
 
         c64::hardware_raster_irq(247);
@@ -141,19 +154,7 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
             let start = FRAME_COUNTER.get() as u16;
 
-            {
-                // Update map
-
-                for x in 0u8..MAP_WIDTH {
-                    for y in 0u8..(MAP_HEIGHT - 1) {
-                        let tile = read_map(x, y);
-
-                        if tile & 0b11111 > 0 && is_dir_down(tile) {
-                            write_map(x, y, 16);
-                        }
-                    }
-                }
-            }
+            update_map();
 
             {
                 // Copy map to screen

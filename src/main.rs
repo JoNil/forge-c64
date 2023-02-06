@@ -84,14 +84,51 @@ static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 #[inline(never)]
 fn update_map() {
-    let mut offset = 0;
+    if false {
+        let mut offset = 0;
+        for y in 0u8..(MAP_HEIGHT - 1) {
+            for x in 0u8..MAP_WIDTH {
+                offset += 1;
+                let tile = read_map(offset);
+                if tile & 0b11111 > 0 {
+                    write_map(offset, 16);
+                }
+            }
+        }
+    } else {
+        let mut offset = MAP_WIDTH as u16;
 
-    for y in 0u8..(MAP_HEIGHT - 1) {
-        for x in 0u8..MAP_WIDTH {
-            offset += 1;
-            let tile = read_map(offset);
-            if tile & 0b11111 > 0 {
-                write_map(offset, 16);
+        for y in 1u8..(MAP_HEIGHT - 1) {
+            for x in 0u8..MAP_WIDTH {
+                let tile = read_map(offset);
+
+                if !has_resource(tile) {
+                    let down_offset = offset + MAP_WIDTH as u16;
+                    let up_offset = offset - MAP_WIDTH as u16;
+                    let left_offset = offset - 1;
+                    let right_offset = offset + 1;
+
+                    let down = read_map(down_offset);
+                    let up = read_map(up_offset);
+                    let left = read_map(left_offset);
+                    let right = read_map(right_offset);
+
+                    if has_resource(down) && is_dir_up(down) {
+                        write_map(offset, set_resource(tile));
+                        write_map(down_offset, clear_resource(down));
+                    } else if has_resource(up) && is_dir_down(up) {
+                        write_map(offset, set_resource(tile));
+                        write_map(up_offset, clear_resource(up));
+                    } else if has_resource(left) && is_dir_right(left) {
+                        write_map(offset, set_resource(tile));
+                        write_map(left_offset, clear_resource(left));
+                    } else if has_resource(right) && is_dir_left(right) {
+                        write_map(offset, set_resource(tile));
+                        write_map(right_offset, clear_resource(right));
+                    }
+                }
+
+                offset += 1;
             }
         }
     }

@@ -138,6 +138,10 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             let mut offset = MAP_WIDTH as u16 * (MAP_HEIGHT - 2) as u16;
             for _ in 0..MAP_WIDTH {
                 write_map(offset, 1);
+                offset += 1;
+            }
+
+            for _ in 0..MAP_WIDTH {
                 write_map_color(offset, RED);
                 offset += 1;
             }

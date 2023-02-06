@@ -66,24 +66,20 @@ fn write_map_color(x: u8, y: u8, color: u8) {
     }
 }
 
-fn is_depositing_down(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 4 || tile == 8 || tile == 12
+fn is_dir_down(tile: u8) -> bool {
+    tile & 0b1100 > 0
 }
 
-fn is_depositing_up(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 2 || tile == 6 || tile == 10
+fn is_dir_up(tile: u8) -> bool {
+    (tile + 2) & 0b1100 > 0
 }
 
-fn is_depositing_right(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 3 || tile == 7 || tile == 11
+fn is_dir_right(tile: u8) -> bool {
+    (tile + 1) & 0b1100 > 0
 }
 
-fn is_depositing_left(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 1 || tile == 5 || tile == 9
+fn is_dir_left(tile: u8) -> bool {
+    (tile + 3) & 0b1100 > 0
 }
 
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
@@ -148,29 +144,12 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
             {
                 // Update map
 
-                for x in 1u8..(MAP_WIDTH - 1) {
-                    for y in 1u8..(MAP_HEIGHT - 1) {
+                for x in 0u8..MAP_WIDTH {
+                    for y in 0u8..(MAP_HEIGHT - 1) {
                         let tile = read_map(x, y);
 
-                        if !has_resource(tile) {
-                            let down = read_map(x, y + 1);
-                            let up = read_map(x, y - 1);
-                            let left = read_map(x - 1, y);
-                            let right = read_map(x + 1, y);
-
-                            if has_resource(down) && is_depositing_up(down) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x, y + 1, clear_resource(down));
-                            } else if has_resource(up) && is_depositing_down(up) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x, y - 1, clear_resource(up));
-                            } else if has_resource(left) && is_depositing_right(left) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x - 1, y, clear_resource(left));
-                            } else if has_resource(right) && is_depositing_left(right) {
-                                write_map(x, y, set_resource(tile));
-                                write_map(x + 1, y, clear_resource(right));
-                            }
+                        if tile & 0b11111 > 0 && is_dir_down(tile) {
+                            write_map(x, y, 16);
                         }
                     }
                 }

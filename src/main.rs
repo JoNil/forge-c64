@@ -136,6 +136,22 @@ static WRITE_MAP_AT_LINE: [fn(x: u8, val: u8); MAP_HEIGHT as usize] = [
 ];
 
 fn read_map_xy(x: u8, y: u8) -> u8 {
+    unsafe {
+        MAP.as_ptr()
+            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .read()
+    }
+}
+
+fn write_map_xy(x: u8, y: u8, val: u8) {
+    unsafe {
+        MAP.as_mut_ptr()
+            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .write(val);
+    }
+}
+
+fn read_map_xy_2(x: u8, y: u8) -> u8 {
     unsafe { READ_MAP_AT_LINE.get_unchecked(y as usize)(x) }
 }
 
@@ -143,7 +159,7 @@ fn write_map_xy(x: u8, y: u8, val: u8) {
     unsafe { WRITE_MAP_AT_LINE.get_unchecked(y as usize)(x, val) }
 }
 
-fn is_dir_down(tile: u8) -> bool {
+/*fn is_dir_down(tile: u8) -> bool {
     tile & 0b1100 > 0
 }
 
@@ -157,11 +173,32 @@ fn is_dir_right(tile: u8) -> bool {
 
 fn is_dir_left(tile: u8) -> bool {
     (tile + 3) & 0b1100 > 0
+}*/
+
+fn is_dir_down(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 4 || tile == 8 || tile == 12
+}
+
+fn is_dir_up(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 2 || tile == 6 || tile == 10
+}
+
+fn is_dir_right(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 3 || tile == 7 || tile == 11
+}
+
+fn is_dir_left(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 1 || tile == 5 || tile == 9
 }
 
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
 static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
+#[inline(never)]
 fn update_map() {
     for x in 1u8..(MAP_WIDTH - 1) {
         for y in 1u8..(MAP_HEIGHT - 1) {

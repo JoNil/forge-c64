@@ -79,62 +79,6 @@ fn write_map_color<const Y: isize>(x: u8, color: u8) {
     }
 }
 
-static READ_MAP_AT_LINE: [fn(x: u8) -> u8; MAP_HEIGHT as usize] = [
-    read_map::<0>,
-    read_map::<1>,
-    read_map::<2>,
-    read_map::<3>,
-    read_map::<4>,
-    read_map::<5>,
-    read_map::<6>,
-    read_map::<7>,
-    read_map::<8>,
-    read_map::<9>,
-    read_map::<10>,
-    read_map::<11>,
-    read_map::<12>,
-    read_map::<13>,
-    read_map::<14>,
-    read_map::<15>,
-    read_map::<16>,
-    read_map::<17>,
-    read_map::<18>,
-    read_map::<19>,
-    read_map::<20>,
-    read_map::<21>,
-    read_map::<22>,
-    read_map::<23>,
-    read_map::<24>,
-];
-
-static WRITE_MAP_AT_LINE: [fn(x: u8, val: u8); MAP_HEIGHT as usize] = [
-    write_map::<0>,
-    write_map::<1>,
-    write_map::<2>,
-    write_map::<3>,
-    write_map::<4>,
-    write_map::<5>,
-    write_map::<6>,
-    write_map::<7>,
-    write_map::<8>,
-    write_map::<9>,
-    write_map::<10>,
-    write_map::<11>,
-    write_map::<12>,
-    write_map::<13>,
-    write_map::<14>,
-    write_map::<15>,
-    write_map::<16>,
-    write_map::<17>,
-    write_map::<18>,
-    write_map::<19>,
-    write_map::<20>,
-    write_map::<21>,
-    write_map::<22>,
-    write_map::<23>,
-    write_map::<24>,
-];
-
 fn read_map_xy(x: u8, y: u8) -> u8 {
     unsafe {
         MAP.as_ptr()
@@ -149,14 +93,6 @@ fn write_map_xy(x: u8, y: u8, val: u8) {
             .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
             .write(val);
     }
-}
-
-fn read_map_xy_2(x: u8, y: u8) -> u8 {
-    unsafe { READ_MAP_AT_LINE.get_unchecked(y as usize)(x) }
-}
-
-fn write_map_xy_2(x: u8, y: u8, val: u8) {
-    unsafe { WRITE_MAP_AT_LINE.get_unchecked(y as usize)(x, val) }
 }
 
 /*fn is_dir_down(tile: u8) -> bool {

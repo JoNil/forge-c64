@@ -155,7 +155,7 @@ fn read_map_xy_2(x: u8, y: u8) -> u8 {
     unsafe { READ_MAP_AT_LINE.get_unchecked(y as usize)(x) }
 }
 
-fn write_map_xy(x: u8, y: u8, val: u8) {
+fn write_map_xy_2(x: u8, y: u8, val: u8) {
     unsafe { WRITE_MAP_AT_LINE.get_unchecked(y as usize)(x, val) }
 }
 

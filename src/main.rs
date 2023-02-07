@@ -1,6 +1,8 @@
 #![no_std]
 #![feature(start)]
 
+use core::hint::unreachable_unchecked;
+
 use map::MAP;
 use mos_hardware::{
     c64::{self, COLOR_RAM},
@@ -131,12 +133,95 @@ fn is_dir_left(tile: u8) -> bool {
     tile == 1 || tile == 5 || tile == 9
 }
 
+fn came_from_down(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 2 || tile == 6 || tile == 10
+}
+
+fn came_from_up(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 4 || tile == 8 || tile == 12
+}
+
+fn came_from_right(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 1 || tile == 5 || tile == 9
+}
+
+fn came_from_left(tile: u8) -> bool {
+    let tile = tile & !RESOURCE_BIT;
+    tile == 3 || tile == 7 || tile == 11
+}
+
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
 static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 #[inline(never)]
 fn update_map() {
-    for x in 1u8..(MAP_WIDTH - 1) {
+    'outer: for y in 0u8..(MAP_HEIGHT - 1) {
+        for x in 0u8..MAP_WIDTH {
+            let mut tile = read_map_xy(x, y);
+
+            let tile_no_resource = tile & !RESOURCE_BIT;
+
+            if tile_no_resource > 0 && tile_no_resource < 16 {
+                let mut x = x;
+                let mut y = y;
+
+                let start_x = x;
+                let start_y = y;
+
+                //let mut i = 0;
+
+                loop {
+                    write_map_xy(x, y, 16);
+
+                    let (next_x, next_y) = if came_from_down(tile) {
+                        (x, y + 1)
+                    } else if came_from_up(tile) {
+                        (x, y - 1)
+                    } else if came_from_left(tile) {
+                        (x - 1, y)
+                    } else if came_from_right(tile) {
+                        (x + 1, y)
+                    } else {
+                        break 'outer;
+                    };
+
+                    let next_tile = read_map_xy(next_x, next_y) & !RESOURCE_BIT;
+                    let next_tile_no_resource = next_tile & !RESOURCE_BIT;
+
+                    let current_has_resource = tile != tile_no_resource;
+                    let next_has_resource = next_tile != next_tile_no_resource;
+
+                    if !current_has_resource && next_has_resource {
+                        //write_map_xy(x, y, set_resource(tile));
+                        //write_map_xy(next_x, next_y, clear_resource(next_tile));
+                    }
+
+                    if next_x == start_x && next_y == start_y {
+                        break 'outer;
+                    }
+
+                    if !(next_tile_no_resource > 0 && next_tile_no_resource < 16) {
+                        break 'outer;
+                    }
+
+                    //i += 1;
+
+                    //if i == 6 {
+                    //    break 'outer;
+                    //}
+
+                    x = next_x;
+                    y = next_y;
+                    tile = next_tile;
+                }
+            }
+        }
+    }
+
+    /*for x in 1u8..(MAP_WIDTH - 1) {
         for y in 1u8..(MAP_HEIGHT - 1) {
             let tile = read_map_xy(x, y);
 
@@ -161,7 +246,7 @@ fn update_map() {
                 }
             }
         }
-    }
+    }*/
 }
 
 #[start]

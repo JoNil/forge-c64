@@ -43,97 +43,148 @@ fn clear_resource(tile: u8) -> u8 {
     tile & (!RESOURCE_BIT)
 }
 
-fn read_map(x: u8, y: u8) -> u8 {
+fn read_map<const Y: isize>(x: u8) -> u8 {
     unsafe {
         MAP.as_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .offset(Y * (MAP_WIDTH as isize))
+            .offset(x as isize)
             .read()
     }
 }
 
-fn read_scratch(x: u8, y: u8) -> u8 {
+fn read_scratch<const O: isize>(offset: u8) -> u8 {
     unsafe {
         (SCRATCH as *const u8)
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .offset(O)
+            .offset(offset as isize)
             .read()
     }
 }
 
-fn write_map(x: u8, y: u8, val: u8) {
+fn write_map<const Y: isize>(x: u8, val: u8) {
     unsafe {
         MAP.as_mut_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .offset(Y * (MAP_WIDTH as isize))
+            .offset(x as isize)
             .write(val);
     }
 }
 
-fn write_map_color(x: u8, y: u8, color: u8) {
+fn write_map_color<const Y: isize>(x: u8, color: u8) {
     unsafe {
         COLOR_RAM
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
+            .offset(Y * (MAP_WIDTH as isize))
+            .offset(x as isize)
             .write(color);
     }
 }
 
+static READ_MAP_AT_LINE: [fn(x: u8) -> u8; MAP_HEIGHT as usize] = [
+    read_map::<0>,
+    read_map::<1>,
+    read_map::<2>,
+    read_map::<3>,
+    read_map::<4>,
+    read_map::<5>,
+    read_map::<6>,
+    read_map::<7>,
+    read_map::<8>,
+    read_map::<9>,
+    read_map::<10>,
+    read_map::<11>,
+    read_map::<12>,
+    read_map::<13>,
+    read_map::<14>,
+    read_map::<15>,
+    read_map::<16>,
+    read_map::<17>,
+    read_map::<18>,
+    read_map::<19>,
+    read_map::<20>,
+    read_map::<21>,
+    read_map::<22>,
+    read_map::<23>,
+    read_map::<24>,
+];
+
+static WRITE_MAP_AT_LINE: [fn(x: u8, val: u8); MAP_HEIGHT as usize] = [
+    write_map::<0>,
+    write_map::<1>,
+    write_map::<2>,
+    write_map::<3>,
+    write_map::<4>,
+    write_map::<5>,
+    write_map::<6>,
+    write_map::<7>,
+    write_map::<8>,
+    write_map::<9>,
+    write_map::<10>,
+    write_map::<11>,
+    write_map::<12>,
+    write_map::<13>,
+    write_map::<14>,
+    write_map::<15>,
+    write_map::<16>,
+    write_map::<17>,
+    write_map::<18>,
+    write_map::<19>,
+    write_map::<20>,
+    write_map::<21>,
+    write_map::<22>,
+    write_map::<23>,
+    write_map::<24>,
+];
+
+fn read_map_xy(x: u8, y: u8) -> u8 {
+    unsafe { READ_MAP_AT_LINE.get_unchecked(y as usize)(x) }
+}
+
+fn write_map_xy(x: u8, y: u8, val: u8) {
+    unsafe { WRITE_MAP_AT_LINE.get_unchecked(y as usize)(x, val) }
+}
+
 fn is_dir_down(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 4 || tile == 8 || tile == 12
+    tile & 0b1100 > 0
 }
 
 fn is_dir_up(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 2 || tile == 6 || tile == 10
+    (tile + 2) & 0b1100 > 0
 }
 
 fn is_dir_right(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 3 || tile == 7 || tile == 11
+    (tile + 1) & 0b1100 > 0
 }
 
 fn is_dir_left(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 1 || tile == 5 || tile == 9
+    (tile + 3) & 0b1100 > 0
 }
 
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
 static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 fn update_map() {
-    if false {
-        for y in 0u8..(MAP_HEIGHT - 1) {
-            for x in 0u8..MAP_WIDTH {
-                let tile = read_map(x, y);
-                if tile & 0b11111 > 0 {
-                    write_map(x, y, 16);
-                }
-            }
-        }
-    } else {
-        // Update map
+    for x in 1u8..(MAP_WIDTH - 1) {
+        for y in 1u8..(MAP_HEIGHT - 1) {
+            let tile = read_map_xy(x, y);
 
-        for x in 1u8..(MAP_WIDTH - 1) {
-            for y in 1u8..(MAP_HEIGHT - 1) {
-                let tile = read_map(x, y);
+            if !has_resource(tile) {
+                let down = read_map_xy(x, y + 1);
+                let up = read_map_xy(x, y - 1);
+                let left = read_map_xy(x - 1, y);
+                let right = read_map_xy(x + 1, y);
 
-                if !has_resource(tile) {
-                    let down = read_map(x, y + 1);
-                    let up = read_map(x, y - 1);
-                    let left = read_map(x - 1, y);
-                    let right = read_map(x + 1, y);
-
-                    if has_resource(down) && is_dir_up(down) {
-                        write_map(x, y, set_resource(tile));
-                        write_map(x, y + 1, clear_resource(down));
-                    } else if has_resource(up) && is_dir_down(up) {
-                        write_map(x, y, set_resource(tile));
-                        write_map(x, y - 1, clear_resource(up));
-                    } else if has_resource(left) && is_dir_right(left) {
-                        write_map(x, y, set_resource(tile));
-                        write_map(x - 1, y, clear_resource(left));
-                    } else if has_resource(right) && is_dir_left(right) {
-                        write_map(x, y, set_resource(tile));
-                        write_map(x + 1, y, clear_resource(right));
-                    }
+                if has_resource(down) && is_dir_up(down) {
+                    write_map_xy(x, y, set_resource(tile));
+                    write_map_xy(x, y + 1, clear_resource(down));
+                } else if has_resource(up) && is_dir_down(up) {
+                    write_map_xy(x, y, set_resource(tile));
+                    write_map_xy(x, y - 1, clear_resource(up));
+                } else if has_resource(left) && is_dir_right(left) {
+                    write_map_xy(x, y, set_resource(tile));
+                    write_map_xy(x - 1, y, clear_resource(left));
+                } else if has_resource(right) && is_dir_left(right) {
+                    write_map_xy(x, y, set_resource(tile));
+                    write_map_xy(x + 1, y, clear_resource(right));
                 }
             }
         }
@@ -178,11 +229,11 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
         }
 
         for x in 0..MAP_WIDTH {
-            write_map(x, MAP_HEIGHT - 2, 1);
+            write_map::<{ (MAP_HEIGHT - 2) as isize }>(x, 1);
         }
 
         for x in 0..MAP_WIDTH {
-            write_map_color(x, MAP_HEIGHT - 1, RED);
+            write_map_color::<{ (MAP_HEIGHT - 1) as isize }>(x, RED);
         }
 
         c64::hardware_raster_irq(247);

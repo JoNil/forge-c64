@@ -1,12 +1,10 @@
 #![no_std]
 #![no_main]
 
-use core::hint::unreachable_unchecked;
-
 use map::MAP;
 use mos_hardware::{
     c64::{self, COLOR_RAM},
-    cia::GameController,
+    cia::{CIA2DirectionA, CIA2PortA},
     vic2::{
         CharsetBank, ControlXFlags, ScreenBank, BLACK, BROWN, GRAY1, LIGHT_GREEN, LIGHT_RED, RED,
         YELLOW,
@@ -267,8 +265,8 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
         screen::clear_text(&mut *TEXT_SCREEN_2);
 
         // Set VIC2 memory at 0x8000–0xBFFF
-        cia2.data_direction_port_a.write(0b11);
-        cia2.port_a.write(GameController::from_bits(0b01).unwrap());
+        cia2.data_direction_port_a.write(CIA2DirectionA::VA15 | CIA2DirectionA::VA14);
+        cia2.port_a.write(CIA2PortA::VA14);
 
         (&mut *CHARSET_1)[0..256].copy_from_slice(&TILESET[8 * (0 * 64)..8 * (32 + 0 * 64)]);
         (&mut *CHARSET_2)[0..256].copy_from_slice(&TILESET[8 * (1 * 64)..8 * (32 + 1 * 64)]);

@@ -1,5 +1,5 @@
 {
-    "image": "mrkits/rust-mos",
+    "image": "mrkits/rust-mos:d6ed9aa89-7d9eac4-9c135159",
     "settings": {
         "rust-analyzer.checkOnSave.allTargets": false,
         "rust-analyzer.checkOnSave.command": "check",

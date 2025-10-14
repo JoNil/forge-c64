@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(start)]
+#![no_main]
 
 use core::hint::unreachable_unchecked;
 
@@ -249,8 +249,8 @@ fn update_map() {
     }*/
 }
 
-#[start]
-pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
+#[no_mangle]
+extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ffi::c_int {
     let vic2 = c64::vic2();
     let cia2 = c64::cia2();
 

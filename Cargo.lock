@@ -107,6 +107,7 @@ checksum = "52051878f80a721bb68ebfbc930e07b65ba72f2da88968ea5c06fd6ca3d3a127"
 name = "forge-c64"
 version = "0.1.0"
 dependencies = [
+ "mos-alloc",
  "mos-hardware",
  "ufmt",
  "vcell",
@@ -178,6 +179,12 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
+name = "mos-alloc"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a039937a57432473f9bb3d47826ae9633b2dbf85d668b20dc3b485299fdb6387"
 
 [[package]]
 name = "mos-hardware"

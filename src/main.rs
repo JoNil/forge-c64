@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+extern crate mos_alloc;
+
 use map::MAP;
 use mos_hardware::{
     c64::{self, COLOR_RAM},

@@ -5,17 +5,21 @@ authors = ["Jonathan Nilsson <jonathan@voysys.se>"]
 edition = "2021"
 
 [profile.dev]
-debug = 2
-opt-level = "z"
 lto = true
+opt-level = 2
+debug = 2
 codegen-units = 1
 
 [profile.release]
-opt-level = "z"
+opt-level = "s"
 lto = true
+strip = true
+panic = "abort"
 codegen-units = 1
+debug = 0
 
 [dependencies]
-mos-hardware = { git = "https://github.com/mlund/mos-hardware", branch = "main" }
+mos-alloc = "0.2"
+mos-hardware = { git = "https://github.com/mlund/mos-hardware", branch = "main", default-features = false, features = ["c64", "bindgen"] }
 ufmt = "0.2"
 vcell = "0.1"

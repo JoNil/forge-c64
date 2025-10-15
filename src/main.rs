@@ -21,12 +21,15 @@ use tileset::TILESET;
 use ufmt::uwrite;
 use vcell::VolatileCell;
 
+use crate::entity::entities;
+
 mod map;
 mod scratch;
 mod screen;
 mod text_writer;
 mod tile;
 mod tileset;
+mod entity;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 

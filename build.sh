@@ -6,6 +6,9 @@ source ./toolkit.sh
 
 export MSYS2_ARG_CONV_EXCL="*"
 
+rm target/mos-c64-none/release/*.s || true
+rm target/mos-c64-none/release/forge-c64 || true
+
 docker run -it \
     --mount type=bind,src="$(pwd)",target=/home/mos/forge-c64 \
     --mount type=bind,src="$(pwd)/target/mos-c64-none/release",target=/home/mos/forge-c64/out \
@@ -23,6 +26,8 @@ docker run -it \
 
         cd forge-c64
         cargo build --release
-        cp target/mos-c64-none/release/forge-c64 out/'
+        cargo rustc --release -- --emit asm
+        cp target/mos-c64-none/release/forge-c64 out/
+        cp target/mos-c64-none/release/deps/*.s out/'
 docker container prune -f > /dev/null
 du -bh target/mos-c64-none/release/forge-c64

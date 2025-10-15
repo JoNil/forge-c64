@@ -21,232 +21,27 @@ use tileset::TILESET;
 use ufmt::uwrite;
 use vcell::VolatileCell;
 
+use crate::map::{write_map, write_map_color, MAP_HEIGHT, MAP_WIDTH};
+
 mod map;
 mod screen;
 mod text_writer;
 mod tileset;
+mod tile;
 
-const SCRATCH: *mut [u8; 4096] = (0x9000) as *mut [u8; 4096];
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
-const RESOURCE_BIT: u8 = 0x10;
-const MAP_WIDTH: u8 = 40;
-const MAP_HEIGHT: u8 = 25;
-
-fn has_resource(tile: u8) -> bool {
-    tile & RESOURCE_BIT > 0
-}
-
-fn set_resource(tile: u8) -> u8 {
-    tile | RESOURCE_BIT
-}
-
-fn clear_resource(tile: u8) -> u8 {
-    tile & (!RESOURCE_BIT)
-}
-
-fn read_map<const Y: isize>(x: u8) -> u8 {
-    unsafe {
-        MAP.as_ptr()
-            .offset(Y * (MAP_WIDTH as isize))
-            .offset(x as isize)
-            .read()
-    }
-}
-
-fn read_scratch<const O: isize>(offset: u8) -> u8 {
-    unsafe {
-        (SCRATCH as *const u8)
-            .offset(O)
-            .offset(offset as isize)
-            .read()
-    }
-}
-
-fn write_map<const Y: isize>(x: u8, val: u8) {
-    unsafe {
-        MAP.as_mut_ptr()
-            .offset(Y * (MAP_WIDTH as isize))
-            .offset(x as isize)
-            .write(val);
-    }
-}
-
-fn write_map_color<const Y: isize>(x: u8, color: u8) {
-    unsafe {
-        COLOR_RAM
-            .offset(Y * (MAP_WIDTH as isize))
-            .offset(x as isize)
-            .write(color);
-    }
-}
-
-fn read_map_xy(x: u8, y: u8) -> u8 {
-    unsafe {
-        MAP.as_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
-            .read()
-    }
-}
-
-fn write_map_xy(x: u8, y: u8, val: u8) {
-    unsafe {
-        MAP.as_mut_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
-            .write(val);
-    }
-}
-
-/*fn is_dir_down(tile: u8) -> bool {
-    tile & 0b1100 > 0
-}
-
-fn is_dir_up(tile: u8) -> bool {
-    (tile + 2) & 0b1100 > 0
-}
-
-fn is_dir_right(tile: u8) -> bool {
-    (tile + 1) & 0b1100 > 0
-}
-
-fn is_dir_left(tile: u8) -> bool {
-    (tile + 3) & 0b1100 > 0
-}*/
-
-fn is_dir_down(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 4 || tile == 8 || tile == 12
-}
-
-fn is_dir_up(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 2 || tile == 6 || tile == 10
-}
-
-fn is_dir_right(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 3 || tile == 7 || tile == 11
-}
-
-fn is_dir_left(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 1 || tile == 5 || tile == 9
-}
-
-fn came_from_down(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 2 || tile == 6 || tile == 10
-}
-
-fn came_from_up(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 4 || tile == 8 || tile == 12
-}
-
-fn came_from_right(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 1 || tile == 5 || tile == 9
-}
-
-fn came_from_left(tile: u8) -> bool {
-    let tile = tile & !RESOURCE_BIT;
-    tile == 3 || tile == 7 || tile == 11
-}
 
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
 static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 #[inline(never)]
-fn update_map() {
-    'outer: for y in 0u8..(MAP_HEIGHT - 1) {
-        for x in 0u8..MAP_WIDTH {
-            let mut tile = read_map_xy(x, y);
+fn copy_screen() {
+    let screen = screen::current();
 
-            let tile_no_resource = tile & !RESOURCE_BIT;
-
-            if tile_no_resource > 0 && tile_no_resource < 16 {
-                let mut x = x;
-                let mut y = y;
-
-                let start_x = x;
-                let start_y = y;
-
-                //let mut i = 0;
-
-                loop {
-                    write_map_xy(x, y, 16);
-
-                    let (next_x, next_y) = if came_from_down(tile) {
-                        (x, y + 1)
-                    } else if came_from_up(tile) {
-                        (x, y - 1)
-                    } else if came_from_left(tile) {
-                        (x - 1, y)
-                    } else if came_from_right(tile) {
-                        (x + 1, y)
-                    } else {
-                        break 'outer;
-                    };
-
-                    let next_tile = read_map_xy(next_x, next_y) & !RESOURCE_BIT;
-                    let next_tile_no_resource = next_tile & !RESOURCE_BIT;
-
-                    let current_has_resource = tile != tile_no_resource;
-                    let next_has_resource = next_tile != next_tile_no_resource;
-
-                    if !current_has_resource && next_has_resource {
-                        //write_map_xy(x, y, set_resource(tile));
-                        //write_map_xy(next_x, next_y, clear_resource(next_tile));
-                    }
-
-                    if next_x == start_x && next_y == start_y {
-                        break 'outer;
-                    }
-
-                    if !(next_tile_no_resource > 0 && next_tile_no_resource < 16) {
-                        break 'outer;
-                    }
-
-                    //i += 1;
-
-                    //if i == 6 {
-                    //    break 'outer;
-                    //}
-
-                    x = next_x;
-                    y = next_y;
-                    tile = next_tile;
-                }
-            }
-        }
+    unsafe {
+        (*screen)[0..960].copy_from_slice(&MAP[0..960]);
     }
-
-    /*for x in 1u8..(MAP_WIDTH - 1) {
-        for y in 1u8..(MAP_HEIGHT - 1) {
-            let tile = read_map_xy(x, y);
-
-            if !has_resource(tile) {
-                let down = read_map_xy(x, y + 1);
-                let up = read_map_xy(x, y - 1);
-                let left = read_map_xy(x - 1, y);
-                let right = read_map_xy(x + 1, y);
-
-                if has_resource(down) && is_dir_up(down) {
-                    write_map_xy(x, y, set_resource(tile));
-                    write_map_xy(x, y + 1, clear_resource(down));
-                } else if has_resource(up) && is_dir_down(up) {
-                    write_map_xy(x, y, set_resource(tile));
-                    write_map_xy(x, y - 1, clear_resource(up));
-                } else if has_resource(left) && is_dir_right(left) {
-                    write_map_xy(x, y, set_resource(tile));
-                    write_map_xy(x - 1, y, clear_resource(left));
-                } else if has_resource(right) && is_dir_left(right) {
-                    write_map_xy(x, y, set_resource(tile));
-                    write_map_xy(x + 1, y, clear_resource(right));
-                }
-            }
-        }
-    }*/
 }
 
 #[no_mangle]
@@ -305,12 +100,8 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
 
             let start = FRAME_COUNTER.get() as u16;
 
-            update_map();
-
             {
-                // Copy map to screen
-                let screen = screen::current();
-                (*screen)[0..960].copy_from_slice(&MAP[0..960]);
+                copy_screen();
             }
 
             {

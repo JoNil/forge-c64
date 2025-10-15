@@ -37,10 +37,13 @@ static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
 
 #[inline(never)]
 fn copy_screen() {
-    let screen = screen::current();
-
     unsafe {
-        (*screen)[0..960].copy_from_slice(&MAP[0..960]);
+        let screen = screen::current() as *mut u8;
+        let map = MAP.as_mut_ptr();
+
+        for i in 0..960 {
+           *screen.offset(i) = *map.offset(i)
+        }
     }
 }
 
@@ -100,9 +103,7 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
 
             let start = FRAME_COUNTER.get() as u16;
 
-            {
-                copy_screen();
-            }
+            copy_screen();
 
             {
                 let mut end = FRAME_COUNTER.get() as u16;

@@ -2,13 +2,8 @@
 
 set -e
 
-#!/bin/bash
-
-set -e
-
 source ./toolkit.sh
 
-export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL="*"
 
 docker run -it \

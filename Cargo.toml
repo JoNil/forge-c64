@@ -21,5 +21,4 @@ debug = 0
 [dependencies]
 mos-alloc = "0.2"
 mos-hardware = { git = "https://github.com/mlund/mos-hardware", branch = "main", default-features = false, features = ["c64", "bindgen"] }
-ufmt = "0.2"
 vcell = "0.1"

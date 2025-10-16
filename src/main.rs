@@ -16,20 +16,21 @@ use screen::{
     ANIMATION_COUNTER, CHARSET_1, CHARSET_2, CHARSET_3, CHARSET_4, DRAW_TO_SCREEN_2, SCREEN_1,
     SCREEN_2, TEXT_SCREEN_1, TEXT_SCREEN_2,
 };
-use text_writer::MapTextWriter;
 use tileset::TILESET;
-use ufmt::uwrite;
 use vcell::VolatileCell;
 
-use crate::entity::{entities, update_entites};
+use crate::{
+    entity::{entities, update_entites},
+    screen::current_text, text::digit_to_screen_code,
+};
 
 mod entity;
 mod map;
 mod scratch;
 mod screen;
-mod text_writer;
 mod tile;
 mod tileset;
+mod text;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 
@@ -101,10 +102,6 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
         loop {
             while NEW_FRAME.get() > 0 {}
 
-            let mut w = MapTextWriter::new();
-
-            screen::clear_text(&mut *screen::current_text());
-
             let start = FRAME_COUNTER.get() as u16;
 
             update_entites();
@@ -120,9 +117,10 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
 
                 let entity_count = (*entities()).count;
 
-                uwrite!(&mut w, "{} ", time).ok();
-                uwrite!(&mut w, "{}", entity_count).ok();
-                uwrite!(&mut w, " HELLO WORLD").ok();
+                let text = &mut *current_text();
+
+                text[0] = digit_to_screen_code(time as u8);
+                text[2] = digit_to_screen_code(entity_count);
             }
 
             NEW_FRAME.set(1);

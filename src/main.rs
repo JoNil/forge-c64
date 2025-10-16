@@ -118,7 +118,7 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
 
                 let entity_count = (*entities()).count;
 
-                uwrite!(&mut w, "{}", time).ok();
+                uwrite!(&mut w, "{} ", time).ok();
                 uwrite!(&mut w, "{}", entity_count).ok();
                 uwrite!(&mut w, " HELLO WORLD").ok();
             }

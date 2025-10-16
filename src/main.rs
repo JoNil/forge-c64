@@ -23,13 +23,13 @@ use vcell::VolatileCell;
 
 use crate::entity::entities;
 
+mod entity;
 mod map;
 mod scratch;
 mod screen;
 mod text_writer;
 mod tile;
 mod tileset;
-mod entity;
 
 const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 
@@ -94,6 +94,8 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
             write_map_color::<{ (MAP_HEIGHT - 1) as isize }>(x, RED);
         }
 
+        entity::find_initial();
+
         c64::hardware_raster_irq(247);
 
         loop {
@@ -113,7 +115,11 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
                     end += 255;
                 }
                 let time = end - start;
+
+                let entity_count = (*entities()).count;
+
                 uwrite!(&mut w, "{}", time).ok();
+                uwrite!(&mut w, "{}", entity_count).ok();
                 uwrite!(&mut w, " HELLO WORLD").ok();
             }
 

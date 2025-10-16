@@ -21,7 +21,7 @@ use tileset::TILESET;
 use ufmt::uwrite;
 use vcell::VolatileCell;
 
-use crate::entity::entities;
+use crate::entity::{entities, update_entites};
 
 mod entity;
 mod map;
@@ -106,6 +106,8 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
             screen::clear_text(&mut *screen::current_text());
 
             let start = FRAME_COUNTER.get() as u16;
+
+            update_entites();
 
             copy_screen();
 

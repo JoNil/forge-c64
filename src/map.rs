@@ -95,19 +95,3 @@ pub fn write_map_color<const Y: isize>(x: u8, color: u8) {
             .write(color);
     }
 }
-
-pub fn read_map_xy(x: u8, y: u8) -> u8 {
-    unsafe {
-        MAP.as_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
-            .read()
-    }
-}
-
-pub fn write_map_xy(x: u8, y: u8, val: u8) {
-    unsafe {
-        MAP.as_mut_ptr()
-            .offset((x as isize) + (y as isize) * (MAP_WIDTH as isize))
-            .write(val);
-    }
-}

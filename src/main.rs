@@ -71,10 +71,10 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
             .write(CIA2DirectionA::VA15 | CIA2DirectionA::VA14);
         cia2.port_a.write(CIA2PortA::VA14);
 
-        (&mut *CHARSET_1)[0..256].copy_from_slice(&TILESET[8 * (0 * 64)..8 * (32 + 0 * 64)]);
-        (&mut *CHARSET_2)[0..256].copy_from_slice(&TILESET[8 * (1 * 64)..8 * (32 + 1 * 64)]);
-        (&mut *CHARSET_3)[0..256].copy_from_slice(&TILESET[8 * (2 * 64)..8 * (32 + 2 * 64)]);
-        (&mut *CHARSET_4)[0..256].copy_from_slice(&TILESET[8 * (3 * 64)..8 * (32 + 3 * 64)]);
+        (&mut *CHARSET_1)[0..512].copy_from_slice(&TILESET[8 * (0 * 64)..8 * (64 + 0 * 64)]);
+        (&mut *CHARSET_2)[0..512].copy_from_slice(&TILESET[8 * (1 * 64)..8 * (64 + 1 * 64)]);
+        (&mut *CHARSET_3)[0..512].copy_from_slice(&TILESET[8 * (2 * 64)..8 * (64 + 2 * 64)]);
+        (&mut *CHARSET_4)[0..512].copy_from_slice(&TILESET[8 * (3 * 64)..8 * (64 + 3 * 64)]);
 
         for i in 0..1000 {
             COLOR_RAM.offset(i).write(LIGHT_RED);

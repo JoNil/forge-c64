@@ -25,6 +25,7 @@ docker run -it \
         sudo chown mos:mos /home/mos/forge-c64/target
 
         cd forge-c64
+        rm target/mos-c64-none/release/deps/*.s || true
         cargo build --release
         cargo rustc --release -- --emit asm
         cp target/mos-c64-none/release/forge-c64 out/

@@ -88,10 +88,6 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
         }
 
         for x in 0..MAP_WIDTH {
-            write_map::<{ (MAP_HEIGHT - 2) as isize }>(x, 1);
-        }
-
-        for x in 0..MAP_WIDTH {
             write_map_color::<{ (MAP_HEIGHT - 1) as isize }>(x, RED);
         }
 

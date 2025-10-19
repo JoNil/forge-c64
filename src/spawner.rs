@@ -1,14 +1,13 @@
 use crate::{
     entity::MAX_ENTITIES,
     map::{MAP, MAP_HEIGHT, MAP_WIDTH},
-    spawner,
-    tile::{clear_animation_counter, clear_resource, has_resource, set_resource},
+    tile::{clear_animation_counter, has_resource, set_resource},
     tileset::state,
 };
 
 pub const MAX_SPAWNERS: usize = 64;
-pub const SPAW_TIME_MASK: usize = 0b11111;
-pub const SPAW_TIME: u8 = 23;
+pub const SPAW_TIME_MASK: usize = 0b1111;
+pub const SPAW_TIME: u8 = 15;
 
 pub const LEFT_SPAWNER: u8 = 33;
 pub const TOP_SPAWNER: u8 = 34;

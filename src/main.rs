@@ -3,7 +3,7 @@
 
 extern crate mos_alloc;
 
-use map::{write_map, write_map_color, MAP, MAP_HEIGHT, MAP_WIDTH};
+use map::{write_map_color, MAP, MAP_HEIGHT, MAP_WIDTH};
 use mos_hardware::{
     c64::{self, COLOR_RAM},
     cia::{CIA2DirectionA, CIA2PortA},
@@ -20,19 +20,18 @@ use tileset::TILESET;
 use vcell::VolatileCell;
 
 use crate::{
-    entity::{entities, update_entites},
-    screen::current_text, text::digit_to_screen_code,
+    entity::update_entites, screen::current_text, spawner::update_spawners,
+    text::digit_to_screen_code, tile::ANIMATION_COUNTER_MASK, tileset::state,
 };
 
 mod entity;
 mod map;
 mod scratch;
 mod screen;
+mod spawner;
+mod text;
 mod tile;
 mod tileset;
-mod text;
-
-const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 
 static mut NEW_FRAME: VolatileCell<u8> = VolatileCell::new(0);
 static mut FRAME_COUNTER: VolatileCell<u8> = VolatileCell::new(0);
@@ -82,7 +81,6 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
 
         screen::set_vic2_buffer();
 
-        // Clear animation counter
         for i in 0..MAP.len() {
             MAP[i] &= ANIMATION_COUNTER_MASK;
         }
@@ -91,7 +89,14 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
             write_map_color::<{ (MAP_HEIGHT - 1) as isize }>(x, RED);
         }
 
+        {
+            let state = &mut *state();
+            state.spawners.count = 0;
+            state.entities.count = 0;
+        }
+
         entity::find_initial();
+        spawner::find_initial();
 
         c64::hardware_raster_irq(247);
 
@@ -101,6 +106,7 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
             let start = FRAME_COUNTER.get() as u16;
 
             update_entites();
+            update_spawners();
 
             copy_screen();
 
@@ -111,12 +117,14 @@ extern "C" fn main(_argc: core::ffi::c_int, _argv: *const *const u8) -> core::ff
                 }
                 let time = end - start;
 
-                let entity_count = (*entities()).count;
+                let entity_count = (*state()).entities.count;
+                let spawner_count = (*state()).spawners.count;
 
                 let text = &mut *current_text();
 
                 text[0] = digit_to_screen_code(time as u8);
                 text[2] = digit_to_screen_code(entity_count);
+                text[4] = digit_to_screen_code(spawner_count);
             }
 
             NEW_FRAME.set(1);

@@ -1,4 +1,5 @@
-const RESOURCE_BIT: u8 = 0x10;
+pub const RESOURCE_BIT: u8 = 0x10;
+pub const ANIMATION_COUNTER_MASK: u8 = 0x3f;
 
 pub const fn is_dir_left(tile: u8) -> bool {
     tile == 1 || tile == 5 || tile == 9
@@ -26,4 +27,8 @@ pub const fn set_resource(tile: u8) -> u8 {
 
 pub const fn clear_resource(tile: u8) -> u8 {
     tile & (!RESOURCE_BIT)
+}
+
+pub const fn clear_animation_counter(tile: u8) -> u8 {
+    tile & ANIMATION_COUNTER_MASK
 }
